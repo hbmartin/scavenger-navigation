@@ -58,10 +58,10 @@ export function useGeolocation(active: boolean) {
         const course = nativeCourse ?? derivedCourse
 
         // Re-base once the current base can no longer yield a course (window
-        // closed, or stationary past the grace period — a base frozen at
-        // pause-start would dilute distance/elapsed and suppress the course
-        // long after walking resumes). A base still accruing distance is
-        // kept, so slow walkers get a course too.
+        // closed, base accuracy is unusable, or stationary past the grace
+        // period — a base frozen at pause-start would dilute distance/elapsed
+        // and suppress the course long after walking resumes). A base still
+        // accruing distance is kept, so slow walkers get a course too.
         const base = courseBaseRef.current
         if (course || base === null || courseBaseExpired(base, point)) {
           courseBaseRef.current = point
