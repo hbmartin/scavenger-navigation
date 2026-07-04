@@ -16,6 +16,25 @@ describe('isBearingReliable', () => {
   it('uses a minimum distance floor even with very accurate GPS', () => {
     expect(isBearingReliable({ distanceMeters: 5, accuracyMeters: 1 })).toBe(false)
   })
+
+  it('holds its previous verdict inside the hysteresis band', () => {
+    // threshold 20 m: the band between hide (17) and show (23) keeps state.
+    expect(
+      isBearingReliable({ distanceMeters: 21, accuracyMeters: 10, wasReliable: true }),
+    ).toBe(true)
+    expect(
+      isBearingReliable({ distanceMeters: 21, accuracyMeters: 10, wasReliable: false }),
+    ).toBe(false)
+  })
+
+  it('flips only past the band edges', () => {
+    expect(
+      isBearingReliable({ distanceMeters: 16, accuracyMeters: 10, wasReliable: true }),
+    ).toBe(false)
+    expect(
+      isBearingReliable({ distanceMeters: 24, accuracyMeters: 10, wasReliable: false }),
+    ).toBe(true)
+  })
 })
 
 describe('chooseNavigationHeading', () => {
@@ -27,6 +46,7 @@ describe('chooseNavigationHeading', () => {
         needsCalibration: false,
         courseHeading: null,
         courseConfidence: null,
+        courseStale: false,
       }),
     ).toEqual({ heading: 45, source: 'compass' })
   })
@@ -39,6 +59,7 @@ describe('chooseNavigationHeading', () => {
         needsCalibration: true,
         courseHeading: 90,
         courseConfidence: 'high',
+        courseStale: false,
       }),
     ).toEqual({ heading: 90, source: 'gps-course' })
   })
@@ -51,8 +72,22 @@ describe('chooseNavigationHeading', () => {
         needsCalibration: false,
         courseHeading: 100,
         courseConfidence: 'high',
+        courseStale: false,
       }),
     ).toEqual({ heading: 100, source: 'gps-course' })
+  })
+
+  it('ignores a stale course so the live compass wins after a stop-and-turn', () => {
+    expect(
+      chooseNavigationHeading({
+        compassHeading: 190,
+        compassConfidence: 'high',
+        needsCalibration: false,
+        courseHeading: 10,
+        courseConfidence: 'high',
+        courseStale: true,
+      }),
+    ).toEqual({ heading: 190, source: 'compass' })
   })
 
   it('blends compass and course when they broadly agree', () => {
@@ -62,6 +97,7 @@ describe('chooseNavigationHeading', () => {
       needsCalibration: false,
       courseHeading: 20,
       courseConfidence: 'high',
+      courseStale: false,
     })
     expect(choice.source).toBe('blended')
     expect(choice.heading).not.toBeNull()

@@ -65,4 +65,15 @@ describe('derivedCourseEstimate', () => {
     }
     expect(derivedCourseEstimate(start, next)).toBeNull()
   })
+
+  it('rejects a base point too old to give a meaningful speed', () => {
+    // 300 s window: a fresh walk after a pause must not average against it.
+    const next: CoursePoint = {
+      lat: 34.001,
+      lng: -118,
+      accuracy: 8,
+      timestamp: start.timestamp + 300_000,
+    }
+    expect(derivedCourseEstimate(start, next)).toBeNull()
+  })
 })

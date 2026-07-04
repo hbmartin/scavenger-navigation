@@ -5,10 +5,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   derivedCourseEstimate,
+  MAX_COURSE_BASE_AGE_MS,
   nativeCourseEstimate,
   type CourseConfidence,
   type CoursePoint,
-  type CourseSource,
 } from '@/lib/course'
 
 export interface Fix {
@@ -16,10 +16,8 @@ export interface Fix {
   lng: number
   accuracy: number // meters
   timestamp: number
-  speed: number | null // meters/second
   courseHeading: number | null // direction of travel, degrees clockwise from true north
   courseConfidence: CourseConfidence | null
-  courseSource: CourseSource | null
 }
 
 export function useGeolocation(active: boolean) {
@@ -59,7 +57,12 @@ export function useGeolocation(active: boolean) {
         const derivedCourse = nativeCourse ? null : derivedCourseEstimate(courseBaseRef.current, point)
         const course = nativeCourse ?? derivedCourse
 
-        if (course || courseBaseRef.current === null) {
+        // Re-base while stationary too: a base frozen at pause-start would
+        // dilute distance/elapsed and suppress the course long after walking
+        // resumes (speed recovers only after ~pause/3 of walking).
+        const base = courseBaseRef.current
+        const baseStale = base !== null && point.timestamp - base.timestamp > MAX_COURSE_BASE_AGE_MS
+        if (course || base === null || baseStale) {
           courseBaseRef.current = point
         }
 
@@ -68,10 +71,8 @@ export function useGeolocation(active: boolean) {
           lng: point.lng,
           accuracy: point.accuracy,
           timestamp: point.timestamp,
-          speed: course?.speed ?? pos.coords.speed ?? null,
           courseHeading: course?.heading ?? null,
           courseConfidence: course?.confidence ?? null,
-          courseSource: course?.source ?? null,
         })
       },
       (err) => {

@@ -78,15 +78,7 @@ export function smoothAngle(
 
 /** Circular mean of angles in degrees. Returns null for an empty list. */
 export function circularMeanDegrees(degrees: readonly number[]): number | null {
-  if (degrees.length === 0) return null
-  let x = 0
-  let y = 0
-  for (const deg of degrees) {
-    x += Math.cos(normalize360(deg) * DEG)
-    y += Math.sin(normalize360(deg) * DEG)
-  }
-  if (x === 0 && y === 0) return normalize360(degrees[degrees.length - 1])
-  return normalize360(Math.atan2(y, x) / DEG)
+  return weightedCircularMeanDegrees(degrees.map((angle) => ({ angle, weight: 1 })))
 }
 
 /** Weighted circular mean of angles in degrees. Ignores non-positive weights. */
