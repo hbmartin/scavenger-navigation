@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  courseBaseExpired,
   courseConfidence,
   derivedCourseEstimate,
   nativeCourseEstimate,
@@ -79,5 +80,62 @@ describe('derivedCourseEstimate', () => {
       timestamp: start.timestamp + 300_000,
     }
     expect(derivedCourseEstimate(start, next)).toBeNull()
+  })
+
+  it('accepts the long window a slow walker with mediocre accuracy needs', () => {
+    // Accuracy 24 m → 18 m minimum distance: at ~0.9 m/s that takes ~25 s,
+    // which must fit inside the window or the course is never attainable.
+    const base: CoursePoint = { ...start, accuracy: 24 }
+    const next: CoursePoint = {
+      lat: 34.0002,
+      lng: -118,
+      accuracy: 24,
+      timestamp: start.timestamp + 25_000,
+    }
+    const estimate = derivedCourseEstimate(base, next)
+    expect(estimate).not.toBeNull()
+    expect(estimate?.confidence).toBe('medium')
+  })
+})
+
+describe('courseBaseExpired', () => {
+  const base: CoursePoint = {
+    lat: 34,
+    lng: -118,
+    accuracy: 8,
+    timestamp: 1_700_000_000_000,
+  }
+
+  it('keeps any base inside the stationary grace period', () => {
+    const next: CoursePoint = { ...base, timestamp: base.timestamp + 15_000 }
+    expect(courseBaseExpired(base, next)).toBe(false)
+  })
+
+  it('expires a stationary base past the grace period', () => {
+    // A pause must re-anchor promptly, or resumed walking averages against it.
+    const next: CoursePoint = { ...base, timestamp: base.timestamp + 16_000 }
+    expect(courseBaseExpired(base, next)).toBe(true)
+  })
+
+  it('keeps an old base while distance is still accruing at walking pace', () => {
+    // ~22 m in 16 s: a slow walker must not lose the base before the
+    // estimator's minimum distance is reached.
+    const next: CoursePoint = {
+      lat: 34.0002,
+      lng: -118,
+      accuracy: 8,
+      timestamp: base.timestamp + 16_000,
+    }
+    expect(courseBaseExpired(base, next)).toBe(false)
+  })
+
+  it('expires any base once the derivation window closes', () => {
+    const next: CoursePoint = {
+      lat: 34.001,
+      lng: -118,
+      accuracy: 8,
+      timestamp: base.timestamp + 30_001,
+    }
+    expect(courseBaseExpired(base, next)).toBe(true)
   })
 })

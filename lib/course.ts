@@ -24,12 +24,15 @@ const MEDIUM_CONFIDENCE_ACCURACY_M = 30
 const MAX_COURSE_ACCURACY_M = 40
 const MIN_DERIVED_COURSE_DISTANCE_M = 6
 const DERIVED_DISTANCE_ACCURACY_MULTIPLIER = 0.75
-// A base point older than this can't give a meaningful average speed: after a
-// stationary pause, distance/elapsed dilutes toward zero and suppresses the
-// course long after walking resumes. The watcher re-bases at this age, and the
-// estimator rejects anything older (belt for callers that don't re-base).
-export const MAX_COURSE_BASE_AGE_MS = 15000
-const MAX_DERIVED_COURSE_WINDOW_S = 20
+// Derived-course windowing. A window longer than this averages too much
+// history to describe where the user is heading NOW, so the estimator rejects
+// it. 30 s is sized so the slowest usable pace (MIN_COURSE_SPEED_MPS) still
+// covers the minimum distance at the worst medium-confidence accuracy
+// (0.75 × 30 m = 22.5 m at 0.8 m/s ≈ 28 s) before the window closes.
+export const MAX_DERIVED_COURSE_WINDOW_MS = 30_000
+// Age below which a base is always kept: gives distance time to accrue past
+// the accuracy noise floor before any stationary judgment is made.
+const STATIONARY_REBASE_AGE_MS = 15_000
 
 function finiteNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -64,14 +67,32 @@ export function nativeCourseEstimate(
   }
 }
 
+/**
+ * Should the derived-course base re-anchor onto the current point? True when
+ * the window is too old to describe the present, or when the user has sat on
+ * this base past the stationary grace period without accruing distance at a
+ * pace the estimator could ever accept — a pause would otherwise dilute
+ * distance/elapsed and suppress the course long after walking resumes. A
+ * merely old base that IS accruing distance survives, so slow walkers still
+ * get a course once they cover the minimum distance.
+ */
+export function courseBaseExpired(base: CoursePoint, next: CoursePoint): boolean {
+  const elapsedMs = next.timestamp - base.timestamp
+  if (elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return true
+  if (elapsedMs <= STATIONARY_REBASE_AGE_MS) return false
+  const distance = haversineMeters(base.lat, base.lng, next.lat, next.lng)
+  return distance / (elapsedMs / 1000) < MIN_COURSE_SIGNAL_SPEED_MPS
+}
+
 export function derivedCourseEstimate(
   prev: CoursePoint | null,
   next: CoursePoint,
 ): CourseEstimate | null {
   if (!prev) return null
 
-  const elapsedSeconds = (next.timestamp - prev.timestamp) / 1000
-  if (elapsedSeconds <= 0 || elapsedSeconds > MAX_DERIVED_COURSE_WINDOW_S) return null
+  const elapsedMs = next.timestamp - prev.timestamp
+  if (elapsedMs <= 0 || elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return null
+  const elapsedSeconds = elapsedMs / 1000
 
   const distance = haversineMeters(prev.lat, prev.lng, next.lat, next.lng)
   const accuracy = Math.max(prev.accuracy, next.accuracy)

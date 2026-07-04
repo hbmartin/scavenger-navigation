@@ -4,8 +4,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  courseBaseExpired,
   derivedCourseEstimate,
-  MAX_COURSE_BASE_AGE_MS,
   nativeCourseEstimate,
   type CourseConfidence,
   type CoursePoint,
@@ -57,12 +57,13 @@ export function useGeolocation(active: boolean) {
         const derivedCourse = nativeCourse ? null : derivedCourseEstimate(courseBaseRef.current, point)
         const course = nativeCourse ?? derivedCourse
 
-        // Re-base while stationary too: a base frozen at pause-start would
-        // dilute distance/elapsed and suppress the course long after walking
-        // resumes (speed recovers only after ~pause/3 of walking).
+        // Re-base once the current base can no longer yield a course (window
+        // closed, or stationary past the grace period — a base frozen at
+        // pause-start would dilute distance/elapsed and suppress the course
+        // long after walking resumes). A base still accruing distance is
+        // kept, so slow walkers get a course too.
         const base = courseBaseRef.current
-        const baseStale = base !== null && point.timestamp - base.timestamp > MAX_COURSE_BASE_AGE_MS
-        if (course || base === null || baseStale) {
+        if (course || base === null || courseBaseExpired(base, point)) {
           courseBaseRef.current = point
         }
 
