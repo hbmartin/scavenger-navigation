@@ -2,10 +2,10 @@
 
 // ARRIVED reveal: name + photo, gate to next stop (PRD §6.7).
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckCircle2, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getStopSlug, type Stop } from '@/lib/hunt-data'
+import type { Stop } from '@/lib/hunt-data'
 
 interface ArrivedScreenProps {
   stop: Stop
@@ -17,12 +17,6 @@ interface ArrivedScreenProps {
 
 export function ArrivedScreen({ stop, stopNumber, stopCount, isLast, onNext }: ArrivedScreenProps) {
   const [imageFailed, setImageFailed] = useState(false)
-  const stopSlug = getStopSlug(stop)
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setImageFailed(false)
-  }, [stopSlug])
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 py-10 text-center">
