@@ -30,7 +30,7 @@ export function getStopSlug(stop: Pick<Stop, 'name'>): string {
 export const HUNT: Hunt = {
   id: 'melrose-art-hunt-v1',
   title: 'The Melrose Art Hunt',
-  arrivalRadiusMeters: 25,
+  arrivalRadiusMeters: 12,
   stops: [
     {
       name: 'Test1',

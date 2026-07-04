@@ -28,7 +28,10 @@ export default function StopListPage() {
                 className="rounded-md border border-border bg-card p-4 text-card-foreground"
               >
                 <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-sm text-primary-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-sm text-primary-foreground"
+                  >
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
