@@ -28,11 +28,7 @@ export function useGeolocation(active: boolean) {
       stop()
       return
     }
-    if (!('geolocation' in navigator)) {
-      setError('Geolocation is not supported on this device.')
-      return
-    }
-    setError(null)
+    if (!('geolocation' in navigator)) return // surfaced via `supported` below
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         setError(null)
@@ -55,5 +51,9 @@ export function useGeolocation(active: boolean) {
     return stop
   }, [active, stop])
 
-  return { fix, error }
+  // Derived, not effect-set: support never changes at runtime. Treated as
+  // supported during SSR so server and first client render agree.
+  const supported = typeof navigator === 'undefined' || 'geolocation' in navigator
+
+  return { fix, error: supported ? error : 'Geolocation is not supported on this device.' }
 }
