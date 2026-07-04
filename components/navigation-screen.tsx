@@ -187,6 +187,7 @@ export function NavigationScreen({
   // Keep a small sliver visible so the heat color reads even at the start.
   const ringVisible = heat !== null ? Math.max(ringFraction, 0.04) : 0
   const accuracyMeters = fix ? Math.round(fix.accuracy) : null
+  const hint = stop.hint?.trim()
 
   return (
     <main className="flex min-h-dvh flex-col px-6 py-8">
@@ -205,63 +206,71 @@ export function NavigationScreen({
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-10">
-        {/* Arrow inside the hot/cold approach ring */}
-        <div className="relative flex size-56 items-center justify-center">
-          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 224 224" aria-hidden="true">
-            <circle
-              cx="112"
-              cy="112"
-              r={RING_RADIUS}
-              fill="none"
-              strokeWidth="8"
-              className="stroke-border"
-            />
-            {ringVisible > 0 && (
+        <div className="flex flex-col items-center gap-4">
+          {/* Arrow inside the hot/cold approach ring */}
+          <div className="relative flex size-56 items-center justify-center">
+            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 224 224" aria-hidden="true">
               <circle
                 cx="112"
                 cy="112"
                 r={RING_RADIUS}
                 fill="none"
                 strokeWidth="8"
-                strokeLinecap="round"
-                stroke="currentColor"
-                strokeDasharray={RING_CIRCUMFERENCE}
-                strokeDashoffset={RING_CIRCUMFERENCE * (1 - ringVisible)}
-                className={`transition-all duration-700 ease-out ${heat ? HEAT_CLASS[heat] : ''}`}
+                className="stroke-border"
               />
-            )}
-          </svg>
-          {showDirectionArrow ? (
-            <div
-              className="transition-transform duration-200 ease-out"
-              style={{ transform: `rotate(${arrowRotation.value}deg)` }}
-              role="img"
-              aria-label="Direction to target"
-            >
-              <ArrowUp className="size-36 text-accent" strokeWidth={2.5} aria-hidden="true" />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 px-6 text-center">
-              {needsCalibration ? (
-                <>
-                  <RotateCw className="size-10 animate-spin text-muted-foreground" aria-hidden="true" />
-                  <p className="text-sm font-medium leading-relaxed text-muted-foreground">
-                    Compass needs calibrating — move your phone in a figure-8
-                  </p>
-                </>
-              ) : (
-                <>
-                  <LocateFixed className="size-10 animate-pulse text-muted-foreground" aria-hidden="true" />
-                  <p className="text-sm font-medium leading-relaxed text-muted-foreground">
-                    {!hasFix
-                      ? 'Getting your location…'
-                      : !bearingReliable
-                        ? 'Direction is noisy this close; use distance'
-                        : 'Waiting for compass…'}
-                  </p>
-                </>
+              {ringVisible > 0 && (
+                <circle
+                  cx="112"
+                  cy="112"
+                  r={RING_RADIUS}
+                  fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  strokeDashoffset={RING_CIRCUMFERENCE * (1 - ringVisible)}
+                  className={`transition-all duration-700 ease-out ${heat ? HEAT_CLASS[heat] : ''}`}
+                />
               )}
-            </div>
+            </svg>
+            {showDirectionArrow ? (
+              <div
+                className="transition-transform duration-200 ease-out"
+                style={{ transform: `rotate(${arrowRotation.value}deg)` }}
+                role="img"
+                aria-label="Direction to target"
+              >
+                <ArrowUp className="size-36 text-accent" strokeWidth={2.5} aria-hidden="true" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-6 text-center">
+                {needsCalibration ? (
+                  <>
+                    <RotateCw className="size-10 animate-spin text-muted-foreground" aria-hidden="true" />
+                    <p className="text-sm font-medium leading-relaxed text-muted-foreground">
+                      Compass needs calibrating — move your phone in a figure-8
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <LocateFixed className="size-10 animate-pulse text-muted-foreground" aria-hidden="true" />
+                    <p className="text-sm font-medium leading-relaxed text-muted-foreground">
+                      {!hasFix
+                        ? 'Getting your location…'
+                        : !bearingReliable
+                          ? 'Direction is noisy this close; use distance'
+                          : 'Waiting for compass…'}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {hint && (
+            <p className="max-w-sm text-center text-sm font-medium leading-relaxed text-muted-foreground">
+              {hint}
+            </p>
           )}
         </div>
 

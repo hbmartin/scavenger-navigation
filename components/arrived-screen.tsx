@@ -17,6 +17,7 @@ interface ArrivedScreenProps {
 
 export function ArrivedScreen({ stop, stopNumber, stopCount, isLast, onNext }: ArrivedScreenProps) {
   const [imageFailed, setImageFailed] = useState(false)
+  const description = stop.description?.trim()
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 py-10 text-center">
@@ -47,9 +48,9 @@ export function ArrivedScreen({ stop, stopNumber, stopCount, isLast, onNext }: A
         </div>
       )}
 
-      {stop.description && (
-        <p className="w-full max-w-sm text-pretty text-base leading-relaxed text-muted-foreground">
-          {stop.description}
+      {description && (
+        <p className="w-full max-w-sm whitespace-pre-line text-pretty text-base leading-relaxed text-muted-foreground">
+          {description}
         </p>
       )}
 
