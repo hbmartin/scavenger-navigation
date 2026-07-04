@@ -16,7 +16,7 @@ export interface NavigationHeadingChoice {
 // iOS webkitCompassAccuracy tier boundaries (PRD §12).
 export const IOS_MEDIUM_ACCURACY_DEG = 35
 export const IOS_HIGH_ACCURACY_DEG = 18
-const CONFIDENCE_HYSTERESIS_DEG = 4
+const CONFIDENCE_HYSTERESIS_DEG = 8
 
 // webkitCompassAccuracy jitters at event rate (~50Hz); accuracy dwelling on a
 // tier boundary must not flip the confidence tier — and with it the whole
@@ -24,7 +24,10 @@ const CONFIDENCE_HYSTERESIS_DEG = 4
 // happens at the nominal boundary; demotion only once accuracy clears it by
 // the hysteresis margin. Only the exit gates widen: widening the entry gates
 // instead would strand a steady mid-band accuracy (e.g. 15°, inside the old
-// 14° entry gate) one tier below its nominal classification forever.
+// 14° entry gate) one tier below its nominal classification forever. The
+// margin is 8° because exit-only widening builds the whole band from it —
+// a ±3° wobble across a boundary (17↔23) must land inside one tier, which
+// a 4° margin could not absorb.
 export function compassConfidenceFromAccuracy(
   accuracy: number | undefined,
   previous: HeadingConfidence,
@@ -58,7 +61,9 @@ export const MAX_COURSE_AGE_MS = 4000
 // history — it can embed a turn made many seconds ago (walk north 15 s, turn
 // east: the chord points northeast long after the turn). Such a course may
 // still blend when it broadly agrees, but it must not overrule a live
-// high-confidence compass outright.
+// blend-trusted compass outright. Must stay below MAX_DERIVED_COURSE_WINDOW_MS
+// (lib/course.ts) — the estimator rejects longer windows, so a threshold at or
+// above that cap would never fire.
 export const MAX_OVERRIDE_COURSE_WINDOW_S = 15
 
 export function isBearingReliable(input: {
@@ -95,9 +100,9 @@ export function chooseNavigationHeading(input: {
   courseHeading: number | null
   courseConfidence: CourseConfidence | null
   courseStale: boolean
-  // Derivation window of the course estimate; null/omitted (native or
-  // unknown) is treated as instantaneous.
-  courseWindowSeconds?: number | null
+  // Derivation window of the course estimate; null (native or unknown) is
+  // treated as instantaneous.
+  courseWindowSeconds: number | null
 }): NavigationHeadingChoice {
   const hasCompass = input.compassHeading !== null && !input.needsCalibration
   const hasCourse =
@@ -125,10 +130,11 @@ export function chooseNavigationHeading(input: {
     return { heading: blended, source: 'blended' }
   }
 
-  const longWindow =
-    typeof input.courseWindowSeconds === 'number' &&
-    input.courseWindowSeconds > MAX_OVERRIDE_COURSE_WINDOW_S
-  if (longWindow && input.compassConfidence === 'high') {
+  // Any compass trusted enough to blend is also trusted enough not to be
+  // overruled outright by a chord through history; reaching here with a blend
+  // rule means the disagreement was too wide to blend, so hold the compass.
+  const longWindow = (input.courseWindowSeconds ?? 0) > MAX_OVERRIDE_COURSE_WINDOW_S
+  if (longWindow && blend !== null) {
     return { heading: compass, source: 'compass' }
   }
 
