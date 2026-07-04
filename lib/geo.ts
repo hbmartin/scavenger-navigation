@@ -86,16 +86,10 @@ export function smoothScalar(
   return prev + alpha * (next - prev)
 }
 
-export function metersToFeet(m: number): number {
-  return m * 3.28084
-}
-
-/** Feet below 1000 ft, miles (1 decimal) above. */
+/** Meters below 1000 m, kilometers (1 decimal) above. */
 export function formatDistance(meters: number): { value: string; unit: string } {
-  const feet = metersToFeet(meters)
-  if (feet < 1000) {
-    return { value: String(Math.round(feet)), unit: 'ft' }
+  if (meters < 1000) {
+    return { value: String(Math.round(meters)), unit: 'm' }
   }
-  const miles = feet / 5280
-  return { value: miles.toFixed(1), unit: 'mi' }
+  return { value: (meters / 1000).toFixed(1), unit: 'km' }
 }

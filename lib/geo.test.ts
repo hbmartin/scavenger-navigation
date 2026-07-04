@@ -3,7 +3,6 @@ import {
   bearingDegrees,
   formatDistance,
   haversineMeters,
-  metersToFeet,
   normalize360,
   shortestAngleDelta,
   smoothAngle,
@@ -114,22 +113,15 @@ describe('smoothScalar', () => {
 })
 
 describe('formatDistance', () => {
-  it('shows feet below 1000 ft', () => {
-    expect(formatDistance(100)).toEqual({ value: '328', unit: 'ft' })
-    expect(formatDistance(0)).toEqual({ value: '0', unit: 'ft' })
+  it('shows meters below 1000 m', () => {
+    expect(formatDistance(100)).toEqual({ value: '100', unit: 'm' })
+    expect(formatDistance(0)).toEqual({ value: '0', unit: 'm' })
   })
-  it('switches to miles at 1000 ft', () => {
-    const meters = 1000 / 3.28084 // exactly 1000 ft
-    expect(formatDistance(meters).unit).toBe('mi')
-    expect(formatDistance(meters - 1).unit).toBe('ft')
+  it('switches to kilometers at 1000 m', () => {
+    expect(formatDistance(1000).unit).toBe('km')
+    expect(formatDistance(999).unit).toBe('m')
   })
-  it('formats miles to one decimal', () => {
-    expect(formatDistance(1609.34)).toEqual({ value: '1.0', unit: 'mi' })
-  })
-})
-
-describe('metersToFeet', () => {
-  it('converts correctly', () => {
-    expect(metersToFeet(1)).toBeCloseTo(3.28084)
+  it('formats kilometers to one decimal', () => {
+    expect(formatDistance(1609.34)).toEqual({ value: '1.6', unit: 'km' })
   })
 })

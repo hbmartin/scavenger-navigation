@@ -22,7 +22,6 @@ import {
   bearingDegrees,
   formatDistance,
   haversineMeters,
-  metersToFeet,
   unwrapAngle,
 } from '@/lib/geo'
 import type { Stop } from '@/lib/hunt-data'
@@ -136,7 +135,7 @@ export function NavigationScreen({
   const ringFraction = approachProgress(arrival.startDistance, arrival.smoothedDistance)
   // Keep a small sliver visible so the heat color reads even at the start.
   const ringVisible = heat !== null ? Math.max(ringFraction, 0.04) : 0
-  const accuracyFeet = fix ? Math.round(metersToFeet(fix.accuracy)) : null
+  const accuracyMeters = fix ? Math.round(fix.accuracy) : null
 
   return (
     <main className="flex min-h-dvh flex-col px-6 py-8">
@@ -226,7 +225,7 @@ export function NavigationScreen({
               <p className="text-sm text-muted-foreground">to the next stop</p>
             </>
           ) : (
-            <p className="font-mono text-2xl font-semibold text-muted-foreground">— ft</p>
+            <p className="font-mono text-2xl font-semibold text-muted-foreground">— m</p>
           )}
           {fixStale && (
             <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-600">
@@ -234,8 +233,8 @@ export function NavigationScreen({
               GPS signal lost — showing last known distance
             </p>
           )}
-          {!fixStale && accuracyFeet !== null && (
-            <p className="mt-1 text-xs text-muted-foreground/70">±{accuracyFeet} ft GPS accuracy</p>
+          {!fixStale && accuracyMeters !== null && (
+            <p className="mt-1 text-xs text-muted-foreground/70">±{accuracyMeters} m GPS accuracy</p>
           )}
           {fixError && fixError !== 'permission-denied' && (
             <p className="mt-2 max-w-xs text-xs leading-relaxed text-destructive">{fixError}</p>
