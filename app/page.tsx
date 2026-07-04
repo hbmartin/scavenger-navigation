@@ -86,7 +86,7 @@ export default function HuntPage() {
     if (heading.status === 'unavailable') {
       dispatch({ type: 'COMPASS_LOST' })
     }
-  }, [heading.status])
+  }, [heading.status, phase])
 
   const handleStart = useCallback(() => {
     dispatch({ type: 'START' })
