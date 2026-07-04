@@ -47,6 +47,12 @@ export function ArrivedScreen({ stop, stopNumber, stopCount, isLast, onNext }: A
         </div>
       )}
 
+      {stop.description && (
+        <p className="w-full max-w-sm text-pretty text-base leading-relaxed text-muted-foreground">
+          {stop.description}
+        </p>
+      )}
+
       <Button size="lg" className="h-14 w-full max-w-sm text-lg" onClick={onNext}>
         {isLast ? 'Finish' : 'Next stop'}
       </Button>

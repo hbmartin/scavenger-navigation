@@ -7,6 +7,7 @@ export interface Stop {
   lat: number
   lng: number
   photoUrl?: string // optional arrival photo
+  description?: string // optional arrival description
   radiusMeters?: number // optional per-stop override
 }
 
