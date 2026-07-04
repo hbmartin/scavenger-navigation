@@ -15,6 +15,10 @@ export interface CourseEstimate {
   speed: number
   source: CourseSource
   confidence: CourseConfidence
+  // Seconds of history the heading averages over: 0 for native (the platform
+  // reports the instantaneous course), the base-to-fix elapsed time for
+  // derived chords. Long windows can embed a turn made many seconds ago.
+  windowSeconds: number
 }
 
 export const MIN_COURSE_SPEED_MPS = 0.8
@@ -30,8 +34,8 @@ const DERIVED_DISTANCE_ACCURACY_MULTIPLIER = 0.75
 // covers the minimum distance at the worst medium-confidence accuracy
 // (0.75 × 30 m = 22.5 m at 0.8 m/s ≈ 28 s) before the window closes.
 export const MAX_DERIVED_COURSE_WINDOW_MS = 30_000
-// Age below which a base is always kept: gives distance time to accrue past
-// the accuracy noise floor before any stationary judgment is made.
+// Age below which an otherwise usable base is kept: gives distance time to
+// accrue past the accuracy noise floor before any stationary judgment is made.
 const STATIONARY_REBASE_AGE_MS = 15_000
 
 function finiteNumber(value: number | null | undefined): value is number {
@@ -64,6 +68,7 @@ export function nativeCourseEstimate(
     speed,
     source: 'native',
     confidence,
+    windowSeconds: 0,
   }
 }
 
@@ -79,11 +84,14 @@ export function nativeCourseEstimate(
  */
 export function courseBaseExpired(base: CoursePoint, next: CoursePoint): boolean {
   const elapsedMs = next.timestamp - base.timestamp
+  if (elapsedMs <= 0) return true
   if (elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return true
+  if (courseConfidence(MIN_COURSE_SPEED_MPS, base.accuracy) === null) return true
   if (elapsedMs <= STATIONARY_REBASE_AGE_MS) return false
-  if (!Number.isFinite(base.accuracy) || base.accuracy > MAX_COURSE_ACCURACY_M) return true
+  // "A pace/accuracy the estimator could ever accept" is the estimator's own
+  // gate — delegate so the two can't drift apart.
   const distance = haversineMeters(base.lat, base.lng, next.lat, next.lng)
-  return distance / (elapsedMs / 1000) < MIN_COURSE_SIGNAL_SPEED_MPS
+  return courseConfidence(distance / (elapsedMs / 1000), base.accuracy) === null
 }
 
 export function derivedCourseEstimate(
@@ -113,5 +121,6 @@ export function derivedCourseEstimate(
     speed,
     source: 'derived',
     confidence,
+    windowSeconds: elapsedSeconds,
   }
 }

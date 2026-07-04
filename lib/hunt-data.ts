@@ -106,14 +106,6 @@ export const HUNT: Hunt = {
         'Artists: CBS Crew, WCA and MTA Crews. Alley on the north side of Melrose Ave between Fuller Ave and Poinsettia Pl.',
     },
     {
-      name: 'Dragon Mural',
-      hint: '🍜🐉',
-      photoUrl: 'https://melroseartsdistrict.com/wp-content/uploads/2023/02/14-Dragon-David-Flores.jpg',
-      lat: 34.0836856,
-      lng: -118.3446031,
-      description: 'Artist: David Flores. North side of Melrose Ave near La Brea Ave.',
-    },
-    {
       name: "Lala's Argentine (Wine)",
       hint: '🇦🇷🍷',
       photoUrl: 'https://lalasgrill.com/images/lalas-logo-l.png',
@@ -126,6 +118,14 @@ export const HUNT: Hunt = {
       description: 'Szechuan Fried Chicken!',
       lat: 34.0836419,
       lng: -118.3468362,
+    },
+    {
+      name: 'Dragon Mural',
+      hint: '🍜🐉',
+      photoUrl: 'https://melroseartsdistrict.com/wp-content/uploads/2023/02/14-Dragon-David-Flores.jpg',
+      lat: 34.0836856,
+      lng: -118.3446031,
+      description: 'Artist: David Flores. North side of Melrose Ave near La Brea Ave.',
     },
     {
       name: 'Hollywood Books + Galerie Half',

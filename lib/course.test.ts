@@ -27,6 +27,7 @@ describe('nativeCourseEstimate', () => {
       heading: 10,
       source: 'native',
       confidence: 'high',
+      windowSeconds: 0,
     })
   })
 
@@ -95,6 +96,9 @@ describe('derivedCourseEstimate', () => {
     const estimate = derivedCourseEstimate(base, next)
     expect(estimate).not.toBeNull()
     expect(estimate?.confidence).toBe('medium')
+    // The window length rides along so heading selection can refuse to let a
+    // long chord (which may embed an old turn) overrule a trusted compass.
+    expect(estimate?.windowSeconds).toBe(25)
   })
 })
 
@@ -106,9 +110,24 @@ describe('courseBaseExpired', () => {
     timestamp: 1_700_000_000_000,
   }
 
-  it('keeps any base inside the stationary grace period', () => {
+  it('keeps an accurate base inside the stationary grace period', () => {
     const next: CoursePoint = { ...base, timestamp: base.timestamp + 15_000 }
     expect(courseBaseExpired(base, next)).toBe(false)
+  })
+
+  it('expires a base when timestamps do not advance', () => {
+    const next: CoursePoint = { ...base, timestamp: base.timestamp }
+    expect(courseBaseExpired(base, next)).toBe(true)
+  })
+
+  it('expires an inaccurate base inside the stationary grace period', () => {
+    const inaccurateBase: CoursePoint = { ...base, accuracy: 50 }
+    const next: CoursePoint = {
+      ...base,
+      accuracy: 8,
+      timestamp: base.timestamp + 2_000,
+    }
+    expect(courseBaseExpired(inaccurateBase, next)).toBe(true)
   })
 
   it('expires a stationary base past the grace period', () => {

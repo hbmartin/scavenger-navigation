@@ -71,6 +71,7 @@ function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolea
 
   useEffect(() => {
     if (timestamp === null) return
+    if (isTimestampExpired(timestamp, maxAgeMs)) return
     let timer: number | undefined
     const arm = () => {
       const remainingMs = timestamp + maxAgeMs - Date.now()
@@ -163,6 +164,7 @@ export function NavigationScreen({
     courseHeading: fix?.courseHeading ?? null,
     courseConfidence: fix?.courseConfidence ?? null,
     courseStale,
+    courseWindowSeconds: fix?.courseWindowSeconds ?? null,
   })
   // Hysteresis keyed off the previous verdict, so GPS jitter around the
   // reliability threshold can't strobe the arrow during the final approach.
