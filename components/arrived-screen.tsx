@@ -28,22 +28,24 @@ export function ArrivedScreen({ stop, stopNumber, stopCount, isLast, onNext }: A
         <h1 className="text-3xl font-bold text-balance">{stop.name}</h1>
       </div>
 
-      <div className="w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card">
-        {imageFailed ? (
-          <div className="flex aspect-square flex-col items-center justify-center gap-2 text-muted-foreground">
-            <ImageOff className="size-10" aria-hidden="true" />
-            <p className="text-sm">Photo unavailable</p>
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={stop.photoUrl || '/placeholder.svg'}
-            alt={`Photo of ${stop.name}`}
-            className="aspect-square w-full object-cover"
-            onError={() => setImageFailed(true)}
-          />
-        )}
-      </div>
+      {stop.photoUrl && (
+        <div className="w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card">
+          {imageFailed ? (
+            <div className="flex aspect-square flex-col items-center justify-center gap-2 text-muted-foreground">
+              <ImageOff className="size-10" aria-hidden="true" />
+              <p className="text-sm">Photo unavailable</p>
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={stop.photoUrl}
+              alt={`Photo of ${stop.name}`}
+              className="aspect-square w-full object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </div>
+      )}
 
       <Button size="lg" className="h-14 w-full max-w-sm text-lg" onClick={onNext}>
         {isLast ? 'Finish' : 'Next stop'}

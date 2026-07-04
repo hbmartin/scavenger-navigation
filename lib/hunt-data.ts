@@ -1,13 +1,13 @@
 // Hardcoded hunt data. Edit this file to change the hunt (PRD §5).
+// The order of Hunt.stops defines the hunt sequence.
 // Stops below are sample LA landmarks — swap in your real coordinates.
 
 export interface Stop {
   id: string // stable, used for progress persistence
-  order: number // 1-based; defines sequence
   name: string // revealed only on arrival
   lat: number
   lng: number
-  photoUrl: string // shown on arrival
+  photoUrl?: string // optional arrival photo
   radiusMeters?: number // optional per-stop override
 }
 
@@ -19,13 +19,12 @@ export interface Hunt {
 }
 
 export const HUNT: Hunt = {
-  id: 'la-sample-hunt-v1',
-  title: 'The Los Angeles Hunt',
+  id: 'melrose-art-hunt-v1',
+  title: 'The Melrose Art Hunt',
   arrivalRadiusMeters: 25,
   stops: [
     {
       id: 'griffith',
-      order: 1,
       name: 'Griffith Observatory',
       lat: 34.118434,
       lng: -118.300393,
@@ -33,7 +32,6 @@ export const HUNT: Hunt = {
     },
     {
       id: 'hollywood-sign',
-      order: 2,
       name: 'Hollywood Sign (Lake Hollywood Park)',
       lat: 34.116856,
       lng: -118.339383,
@@ -41,7 +39,6 @@ export const HUNT: Hunt = {
     },
     {
       id: 'echo-park',
-      order: 3,
       name: 'Echo Park Lake Fountain',
       lat: 34.072861,
       lng: -118.260495,
@@ -49,7 +46,6 @@ export const HUNT: Hunt = {
     },
     {
       id: 'venice-canals',
-      order: 4,
       name: 'Venice Canals',
       lat: 33.983215,
       lng: -118.466171,
@@ -57,13 +53,12 @@ export const HUNT: Hunt = {
     },
     {
       id: 'santa-monica-pier',
-      order: 5,
       name: 'Santa Monica Pier',
       lat: 34.008663,
       lng: -118.498646,
       photoUrl: '/stops/santa-monica-pier.png',
     },
-  ].sort((a, b) => a.order - b.order),
+  ],
 }
 
 // ---- Tuning constants (PRD §6.6, §11, §12) ----
