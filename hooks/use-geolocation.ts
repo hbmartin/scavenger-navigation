@@ -3,24 +3,37 @@
 // watchPosition wrapper (PRD §7.5). Watch only while NAVIGATING to save battery.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  derivedCourseEstimate,
+  nativeCourseEstimate,
+  type CourseConfidence,
+  type CoursePoint,
+  type CourseSource,
+} from '@/lib/course'
 
 export interface Fix {
   lat: number
   lng: number
   accuracy: number // meters
   timestamp: number
+  speed: number | null // meters/second
+  courseHeading: number | null // direction of travel, degrees clockwise from true north
+  courseConfidence: CourseConfidence | null
+  courseSource: CourseSource | null
 }
 
 export function useGeolocation(active: boolean) {
   const [fix, setFix] = useState<Fix | null>(null)
   const [error, setError] = useState<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
+  const courseBaseRef = useRef<CoursePoint | null>(null)
 
   const stop = useCallback(() => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
     }
+    courseBaseRef.current = null
   }, [])
 
   useEffect(() => {
@@ -32,11 +45,33 @@ export function useGeolocation(active: boolean) {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         setError(null)
-        setFix({
+        const point: CoursePoint = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
           timestamp: pos.timestamp,
+        }
+        const nativeCourse = nativeCourseEstimate(
+          pos.coords.heading,
+          pos.coords.speed,
+          pos.coords.accuracy,
+        )
+        const derivedCourse = nativeCourse ? null : derivedCourseEstimate(courseBaseRef.current, point)
+        const course = nativeCourse ?? derivedCourse
+
+        if (course || courseBaseRef.current === null) {
+          courseBaseRef.current = point
+        }
+
+        setFix({
+          lat: point.lat,
+          lng: point.lng,
+          accuracy: point.accuracy,
+          timestamp: point.timestamp,
+          speed: course?.speed ?? pos.coords.speed ?? null,
+          courseHeading: course?.heading ?? null,
+          courseConfidence: course?.confidence ?? null,
+          courseSource: course?.source ?? null,
         })
       },
       (err) => {

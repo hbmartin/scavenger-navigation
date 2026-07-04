@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   bearingDegrees,
+  circularMeanDegrees,
   formatDistance,
   haversineMeters,
+  limitAngleStep,
   normalize360,
   shortestAngleDelta,
   smoothAngle,
   smoothScalar,
   unwrapAngle,
+  weightedCircularMeanDegrees,
 } from './geo'
 
 describe('normalize360', () => {
@@ -103,6 +106,37 @@ describe('smoothAngle', () => {
   })
 })
 
+describe('circularMeanDegrees', () => {
+  it('averages across the wrap seam', () => {
+    const mean = circularMeanDegrees([358, 2])
+    expect(mean === null ? false : mean > 350 || mean < 10).toBe(true)
+  })
+  it('returns null for an empty set', () => {
+    expect(circularMeanDegrees([])).toBeNull()
+  })
+})
+
+describe('weightedCircularMeanDegrees', () => {
+  it('biases toward the heavier sample', () => {
+    const mean = weightedCircularMeanDegrees([
+      { angle: 0, weight: 1 },
+      { angle: 90, weight: 3 },
+    ])
+    expect(mean).not.toBeNull()
+    expect(mean as number).toBeGreaterThan(45)
+    expect(mean as number).toBeLessThan(90)
+  })
+})
+
+describe('limitAngleStep', () => {
+  it('limits the shortest angular step', () => {
+    expect(limitAngleStep(10, 90, 20)).toBe(30)
+  })
+  it('limits across the wrap seam', () => {
+    expect(limitAngleStep(350, 10, 5)).toBe(355)
+  })
+})
+
 describe('smoothScalar', () => {
   it('passes through on first sample', () => {
     expect(smoothScalar(null, 42, 0.35)).toBe(42)
@@ -119,7 +153,8 @@ describe('formatDistance', () => {
   })
   it('switches to kilometers at 1000 m', () => {
     expect(formatDistance(1000).unit).toBe('km')
-    expect(formatDistance(999).unit).toBe('m')
+    expect(formatDistance(999.4).unit).toBe('m')
+    expect(formatDistance(999.5)).toEqual({ value: '1.0', unit: 'km' })
   })
   it('formats kilometers to one decimal', () => {
     expect(formatDistance(1609.34)).toEqual({ value: '1.6', unit: 'km' })

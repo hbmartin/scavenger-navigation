@@ -129,6 +129,7 @@ export default function HuntPage() {
           fix={fix}
           fixError={fixError}
           heading={heading.heading}
+          headingConfidence={heading.headingConfidence}
           needsCalibration={heading.needsCalibration}
           onArrived={handleArrived}
         />
