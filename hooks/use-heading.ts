@@ -31,13 +31,28 @@ const HEADING_DEADBAND_DEG = 1.5
 const HEADING_SPIKE_DEG = 80
 const HEADING_SPIKE_CONFIRM_DEG = 25
 const HEADING_MAX_STEP_DEG = 28
+const CONFIDENCE_HYSTERESIS_DEG = 4
 
-function confidenceFromAccuracy(accuracy: number | undefined): HeadingConfidence {
-  if (typeof accuracy !== 'number' || accuracy < 0 || accuracy > IOS_MEDIUM_ACCURACY_DEG) {
-    return 'low'
-  }
-  if (accuracy <= IOS_HIGH_ACCURACY_DEG) return 'high'
-  return 'medium'
+// webkitCompassAccuracy jitters at event rate (~50Hz); accuracy dwelling on a
+// tier boundary must not flip the confidence tier — and with it the whole
+// navigation tree plus the BLEND_RULES weights — at sensor rate. A tier only
+// changes once the accuracy clears the boundary by the hysteresis margin.
+function confidenceFromAccuracy(
+  accuracy: number | undefined,
+  previous: HeadingConfidence,
+): HeadingConfidence {
+  if (typeof accuracy !== 'number' || accuracy < 0) return 'low'
+  const highGate =
+    previous === 'high'
+      ? IOS_HIGH_ACCURACY_DEG + CONFIDENCE_HYSTERESIS_DEG
+      : IOS_HIGH_ACCURACY_DEG - CONFIDENCE_HYSTERESIS_DEG
+  const mediumGate =
+    previous === 'low'
+      ? IOS_MEDIUM_ACCURACY_DEG - CONFIDENCE_HYSTERESIS_DEG
+      : IOS_MEDIUM_ACCURACY_DEG + CONFIDENCE_HYSTERESIS_DEG
+  if (accuracy <= highGate) return 'high'
+  if (accuracy <= mediumGate) return 'medium'
+  return 'low'
 }
 
 export function useHeading() {
@@ -47,6 +62,9 @@ export function useHeading() {
   const [headingConfidence, setHeadingConfidence] = useState<HeadingConfidence>('low')
 
   const smoothedRef = useRef<number | null>(null)
+  // Mirrors headingConfidence for the event handlers (state would be stale
+  // in the once-registered listener closures).
+  const confidenceRef = useRef<HeadingConfidence>('low')
   const cleanupRef = useRef<(() => void) | null>(null)
   const sampleWindowRef = useRef<number[]>([])
   const lastAcceptedRawRef = useRef<number | null>(null)
@@ -111,7 +129,9 @@ export function useHeading() {
         if (typeof compass !== 'number') return
         // Negative or large accuracy → uncalibrated magnetometer (PRD §12).
         const acc = evt.webkitCompassAccuracy
-        setHeadingConfidence(confidenceFromAccuracy(acc))
+        const confidence = confidenceFromAccuracy(acc, confidenceRef.current)
+        confidenceRef.current = confidence
+        setHeadingConfidence(confidence)
         const bad = typeof acc === 'number' && (acc < 0 || acc > IOS_BAD_ACCURACY_DEG)
         setNeedsCalibration(bad)
         if (!bad) applyHeading(compass) // already true north
@@ -136,6 +156,7 @@ export function useHeading() {
       }
       gotAbsolute = true
       setNeedsCalibration(false)
+      confidenceRef.current = 'medium'
       setHeadingConfidence('medium')
       const screenAngle =
         typeof screen !== 'undefined' && screen.orientation

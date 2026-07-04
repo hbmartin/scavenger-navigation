@@ -12,7 +12,6 @@ import {
   approachProgress,
   heatLevel,
   INITIAL_ARRIVAL_STATE,
-  isFixStale,
   manualMarkNeedsConfirmation,
   STALE_FIX_MS,
   type ArrivalState,
@@ -57,6 +56,36 @@ const HEAT_CLASS: Record<HeatLevel, string> = {
 const RING_RADIUS = 108
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
+// Extra timer delay so watchdogs fire safely past their deadline, not on it.
+const WATCHDOG_SLACK_MS = 250
+
+/**
+ * True once `timestamp` has gone unreplaced for `maxAgeMs`. The flag is
+ * derived (expired === timestamp) so a fresh timestamp clears it without an
+ * extra render. The timer re-checks the clock when it fires and re-arms if it
+ * fired early — background tabs clamp timers.
+ */
+function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolean {
+  const [expiredTimestamp, setExpiredTimestamp] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (timestamp === null) return
+    let timer: number | undefined
+    const arm = () => {
+      const remainingMs = timestamp + maxAgeMs - Date.now()
+      if (remainingMs <= 0) {
+        setExpiredTimestamp(timestamp)
+        return
+      }
+      timer = window.setTimeout(arm, remainingMs + WATCHDOG_SLACK_MS)
+    }
+    arm()
+    return () => window.clearTimeout(timer)
+  }, [timestamp, maxAgeMs])
+
+  return timestamp !== null && expiredTimestamp === timestamp
+}
+
 export function NavigationScreen({
   stop,
   stopNumber,
@@ -73,10 +102,12 @@ export function NavigationScreen({
   const [arrival, setArrival] = useState<ArrivalState>(INITIAL_ARRIVAL_STATE)
   const [arrowRotation, setArrowRotation] = useState<number | null>(null)
   const [confirmingFound, setConfirmingFound] = useState(false)
-  // Timestamps the watchdogs have flagged; staleness is derived so a fresh
-  // fix clears the flags without extra renders.
-  const [staleFixTimestamp, setStaleFixTimestamp] = useState<number | null>(null)
-  const [expiredCourseTimestamp, setExpiredCourseTimestamp] = useState<number | null>(null)
+
+  // Previous verdict for the isBearingReliable hysteresis. A dedicated latch,
+  // NOT arrow visibility: the arrow also hides on compass loss and stale
+  // fixes, and re-entering through the wider "show" gate after an unrelated
+  // blip would strand the arrow hidden during the final approach.
+  const [wasBearingReliable, setWasBearingReliable] = useState(false)
 
   const arrivalRef = useRef<ArrivalState>(INITIAL_ARRIVAL_STATE)
   const unwrappedRotationRef = useRef<number | null>(null)
@@ -111,26 +142,15 @@ export function NavigationScreen({
 
   // Stale-fix watchdog: flag when the last fix is old enough that the
   // distance on screen can no longer be trusted (PRD §6.5 hardening).
-  useEffect(() => {
-    if (!fix) return
-    const remaining = Math.max(0, fix.timestamp + STALE_FIX_MS - Date.now())
-    const timer = window.setTimeout(() => {
-      if (isFixStale(fix.timestamp, Date.now())) setStaleFixTimestamp(fix.timestamp)
-    }, remaining + 250)
-    return () => window.clearTimeout(timer)
-  }, [fix])
-  const fixStale = fix !== null && staleFixTimestamp === fix.timestamp
+  const fixStale = useExpiredTimestamp(fix?.timestamp ?? null, STALE_FIX_MS)
 
   // Course-expiry watchdog: a walking course describes where the user WAS
   // heading. If no fresh fix replaces it (platforms can go quiet while the
   // user stands still and turns), stop letting it override the live compass.
-  useEffect(() => {
-    if (!fix || fix.courseHeading === null) return
-    const remaining = Math.max(0, fix.timestamp + MAX_COURSE_AGE_MS - Date.now())
-    const timer = window.setTimeout(() => setExpiredCourseTimestamp(fix.timestamp), remaining + 50)
-    return () => window.clearTimeout(timer)
-  }, [fix])
-  const courseStale = fix !== null && expiredCourseTimestamp === fix.timestamp
+  const courseStale = useExpiredTimestamp(
+    fix !== null && fix.courseHeading !== null ? fix.timestamp : null,
+    MAX_COURSE_AGE_MS,
+  )
 
   const navigationHeading = chooseNavigationHeading({
     compassHeading: heading,
@@ -140,7 +160,7 @@ export function NavigationScreen({
     courseConfidence: fix?.courseConfidence ?? null,
     courseStale,
   })
-  // Hysteresis keyed off the arrow being shown, so GPS jitter around the
+  // Hysteresis keyed off the previous verdict, so GPS jitter around the
   // reliability threshold can't strobe the arrow during the final approach.
   const bearingReliable =
     fix !== null &&
@@ -148,8 +168,19 @@ export function NavigationScreen({
     isBearingReliable({
       distanceMeters: rawDistanceMeters,
       accuracyMeters: fix.accuracy,
-      wasReliable: arrowRotation !== null,
+      wasReliable: wasBearingReliable,
     })
+  // Latch the verdict for the next evaluation (render-time set per React's
+  // "storing information from previous renders"; it converges immediately
+  // because the verdict is a fixed point of its own output).
+  if (bearingReliable !== wasBearingReliable) setWasBearingReliable(bearingReliable)
+
+  // The one arrow gate, shared by the rotation effect and the render so the
+  // two can't drift: heading loss, staleness, and reliability hide the arrow
+  // on the render they flip; the rotation state catches up (clears) in the
+  // effect below.
+  const arrowActive =
+    fix !== null && navigationHeading.heading !== null && !fixStale && bearingReliable
 
   // Arrow rotation via a continuous unwrapped angle so CSS animates the short
   // arc (PRD §12). The arrow keeps rendering the previous rotation for the
@@ -159,16 +190,17 @@ export function NavigationScreen({
     const headingDeg = navigationHeading.heading
     // When the arrow is hidden, clear the rotation rather than keep it:
     // repainting a stale unwrapped angle on re-show would animate a
-    // wrong-way multi-turn spin.
+    // wrong-way multi-turn spin. (The null re-checks only narrow types —
+    // arrowActive already implies them.)
     let next: number | null = null
-    if (fix !== null && headingDeg !== null && !fixStale && bearingReliable) {
+    if (arrowActive && fix !== null && headingDeg !== null) {
       const bearing = bearingDegrees(fix.lat, fix.lng, stop.lat, stop.lng)
       const prev = unwrappedRotationRef.current
       next = prev === null ? normalize360(bearing - headingDeg) : unwrapAngle(prev, bearing - headingDeg)
     }
     unwrappedRotationRef.current = next
     setArrowRotation(next)
-  }, [bearingReliable, fix, fixStale, navigationHeading.heading, stop.lat, stop.lng])
+  }, [arrowActive, fix, navigationHeading.heading, stop.lat, stop.lng])
 
   const handleMarkFound = () => {
     // Manual override needs a second tap when GPS can't corroborate it (PRD §6.8).
@@ -180,10 +212,7 @@ export function NavigationScreen({
   }
 
   const hasFix = fix !== null
-  // Heading loss, staleness, and reliability hide the arrow on the render
-  // they flip; the rotation state catches up (clears) in the effect above.
-  const showDirectionArrow =
-    arrowRotation !== null && navigationHeading.heading !== null && !fixStale && bearingReliable
+  const showDirectionArrow = arrowActive && arrowRotation !== null
   const distance = arrival.smoothedDistance !== null ? formatDistance(arrival.smoothedDistance) : null
   const heat = arrival.smoothedDistance !== null ? heatLevel(arrival.smoothedDistance, radiusMeters) : null
   const ringFraction = approachProgress(arrival.startDistance, arrival.smoothedDistance)
