@@ -55,7 +55,7 @@ export function nativeCourseEstimate(
 ): CourseEstimate | null {
   if (!finiteNumber(heading)) return null
   const confidence = courseConfidence(speed, accuracy)
-  if (confidence === null || !finiteNumber(speed)) return null
+  if (confidence === null || confidence === 'low' || !finiteNumber(speed)) return null
   return {
     heading: normalize360(heading),
     speed,

@@ -33,6 +33,10 @@ describe('nativeCourseEstimate', () => {
     expect(nativeCourseEstimate(Number.NaN, 1.1, 8)).toBeNull()
     expect(nativeCourseEstimate(90, 0, 8)).toBeNull()
   })
+
+  it('ignores low-confidence headings so derived fallback can run', () => {
+    expect(nativeCourseEstimate(90, 0.5, 24)).toBeNull()
+  })
 })
 
 describe('derivedCourseEstimate', () => {

@@ -273,7 +273,7 @@ export function NavigationScreen({
           </div>
 
           {hint && (
-            <p className="max-w-sm text-center text-sm font-medium leading-relaxed text-muted-foreground">
+            <p className="max-w-sm whitespace-pre-line text-center text-sm font-medium leading-relaxed text-muted-foreground">
               {hint}
             </p>
           )}
