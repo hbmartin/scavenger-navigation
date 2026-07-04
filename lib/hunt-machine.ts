@@ -37,6 +37,12 @@ export function initialHuntState(huntId: string): HuntState {
   }
 }
 
+function clampProgress(progress: Progress, stopCount: number): Progress {
+  const lastStopIndex = Math.max(0, stopCount - 1)
+  const currentIndex = Math.min(progress.currentIndex, lastStopIndex)
+  return currentIndex === progress.currentIndex ? progress : { ...progress, currentIndex }
+}
+
 /**
  * Build the reducer for a hunt with `stopCount` stops.
  * Events that are illegal in the current phase are ignored (state returned unchanged).
@@ -46,10 +52,11 @@ export function makeHuntReducer(stopCount: number) {
     switch (event.type) {
       case 'RESTORE': {
         if (state.phase !== 'init') return state
+        const progress = clampProgress(event.progress, stopCount)
         return {
           ...state,
-          progress: event.progress,
-          phase: event.progress.finished ? 'complete' : 'permission-gate',
+          progress,
+          phase: progress.finished ? 'complete' : 'permission-gate',
         }
       }
 
