@@ -30,7 +30,6 @@ const HEADING_SAMPLE_WINDOW = 5
 const HEADING_DEADBAND_DEG = 1.5
 const HEADING_SPIKE_DEG = 80
 const HEADING_SPIKE_CONFIRM_DEG = 25
-const HEADING_SPIKE_CONFIRM_MS = 750
 const HEADING_MAX_STEP_DEG = 28
 
 function confidenceFromAccuracy(accuracy: number | undefined): HeadingConfidence {
@@ -46,31 +45,33 @@ export function useHeading() {
   const [heading, setHeading] = useState<number | null>(null)
   const [needsCalibration, setNeedsCalibration] = useState(false)
   const [headingConfidence, setHeadingConfidence] = useState<HeadingConfidence>('low')
-  const [accuracyDegrees, setAccuracyDegrees] = useState<number | null>(null)
 
   const smoothedRef = useRef<number | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const sampleWindowRef = useRef<number[]>([])
   const lastAcceptedRawRef = useRef<number | null>(null)
-  const pendingSpikeRef = useRef<{ heading: number; timestamp: number } | null>(null)
+  const pendingSpikeRef = useRef<number | null>(null)
 
   const applyHeading = useCallback((raw: number) => {
     const normalized = normalize360(raw)
-    const now = Date.now()
     const lastRaw = lastAcceptedRawRef.current
     let resetWindow = false
 
     if (lastRaw !== null) {
       const rawJump = Math.abs(shortestAngleDelta(lastRaw, normalized))
       if (rawJump >= HEADING_SPIKE_DEG) {
+        // Confirm a spike with the NEXT consistent sample, whatever the event
+        // cadence — a wall-clock window deadlocks at slow rates (each sample
+        // arrives "too late", replaces the pending spike, and the heading
+        // freezes after any real >=80° turn). Accepted samples clear the
+        // pending spike below, so one-off glitches still never get through.
         const pending = pendingSpikeRef.current
         const confirmsPending =
-          pending &&
-          now - pending.timestamp <= HEADING_SPIKE_CONFIRM_MS &&
-          Math.abs(shortestAngleDelta(pending.heading, normalized)) <= HEADING_SPIKE_CONFIRM_DEG
+          pending !== null &&
+          Math.abs(shortestAngleDelta(pending, normalized)) <= HEADING_SPIKE_CONFIRM_DEG
 
         if (!confirmsPending) {
-          pendingSpikeRef.current = { heading: normalized, timestamp: now }
+          pendingSpikeRef.current = normalized
           return
         }
         resetWindow = true
@@ -110,7 +111,6 @@ export function useHeading() {
         if (typeof compass !== 'number') return
         // Negative or large accuracy → uncalibrated magnetometer (PRD §12).
         const acc = evt.webkitCompassAccuracy
-        setAccuracyDegrees(typeof acc === 'number' ? acc : null)
         setHeadingConfidence(confidenceFromAccuracy(acc))
         const bad = typeof acc === 'number' && (acc < 0 || acc > IOS_BAD_ACCURACY_DEG)
         setNeedsCalibration(bad)
@@ -137,7 +137,6 @@ export function useHeading() {
       gotAbsolute = true
       setNeedsCalibration(false)
       setHeadingConfidence('medium')
-      setAccuracyDegrees(null)
       const screenAngle =
         typeof screen !== 'undefined' && screen.orientation
           ? screen.orientation.angle
@@ -192,5 +191,5 @@ export function useHeading() {
     return () => cleanupRef.current?.()
   }, [])
 
-  return { status, heading, needsCalibration, headingConfidence, accuracyDegrees, requestPermission }
+  return { status, heading, needsCalibration, headingConfidence, requestPermission }
 }

@@ -22,12 +22,14 @@ import {
   bearingDegrees,
   formatDistance,
   haversineMeters,
+  normalize360,
   unwrapAngle,
 } from '@/lib/geo'
 import type { Stop } from '@/lib/hunt-data'
 import {
   chooseNavigationHeading,
   isBearingReliable,
+  MAX_COURSE_AGE_MS,
   type HeadingConfidence,
 } from '@/lib/navigation-heading'
 
@@ -42,14 +44,6 @@ interface NavigationScreenProps {
   headingConfidence: HeadingConfidence
   needsCalibration: boolean
   onArrived: () => void
-}
-
-interface ArrowRotationState {
-  value: number
-  fixTimestamp: number
-  heading: number
-  stopLat: number
-  stopLng: number
 }
 
 // Hot/cold signal (PRD §6.4 polish): the ring warms up as the distance drops.
@@ -77,11 +71,12 @@ export function NavigationScreen({
 }: NavigationScreenProps) {
   // Per-stop state resets via the slug-based key remount from HuntPage.
   const [arrival, setArrival] = useState<ArrivalState>(INITIAL_ARRIVAL_STATE)
-  const [arrowRotation, setArrowRotation] = useState<ArrowRotationState | null>(null)
+  const [arrowRotation, setArrowRotation] = useState<number | null>(null)
   const [confirmingFound, setConfirmingFound] = useState(false)
-  // Timestamp of the fix the watchdog has flagged as stale; staleness is
-  // derived so a fresh fix clears the flag without extra renders.
+  // Timestamps the watchdogs have flagged; staleness is derived so a fresh
+  // fix clears the flags without extra renders.
   const [staleFixTimestamp, setStaleFixTimestamp] = useState<number | null>(null)
+  const [expiredCourseTimestamp, setExpiredCourseTimestamp] = useState<number | null>(null)
 
   const arrivalRef = useRef<ArrivalState>(INITIAL_ARRIVAL_STATE)
   const unwrappedRotationRef = useRef<number | null>(null)
@@ -94,22 +89,25 @@ export function NavigationScreen({
     img.src = stop.photoUrl
   }, [stop.photoUrl])
 
+  const rawDistanceMeters = fix
+    ? haversineMeters(fix.lat, fix.lng, stop.lat, stop.lng)
+    : null
+
   // Distance smoothing + geofence debounce on every fix (PRD §6.3, §6.6).
   useEffect(() => {
-    if (!fix) return
+    if (!fix || rawDistanceMeters === null) return
     const prev = arrivalRef.current
     if (prev.arrived) return
 
-    const raw = haversineMeters(fix.lat, fix.lng, stop.lat, stop.lng)
     const next = advanceArrival(prev, {
-      rawDistanceMeters: raw,
+      rawDistanceMeters,
       accuracyMeters: fix.accuracy,
       radiusMeters,
     })
     arrivalRef.current = next
     setArrival(next)
     if (next.arrived) onArrived()
-  }, [fix, stop.lat, stop.lng, radiusMeters, onArrived])
+  }, [fix, rawDistanceMeters, radiusMeters, onArrived])
 
   // Stale-fix watchdog: flag when the last fix is old enough that the
   // distance on screen can no longer be trusted (PRD §6.5 hardening).
@@ -123,43 +121,54 @@ export function NavigationScreen({
   }, [fix])
   const fixStale = fix !== null && staleFixTimestamp === fix.timestamp
 
-  const rawDistanceMeters = fix
-    ? haversineMeters(fix.lat, fix.lng, stop.lat, stop.lng)
-    : null
+  // Course-expiry watchdog: a walking course describes where the user WAS
+  // heading. If no fresh fix replaces it (platforms can go quiet while the
+  // user stands still and turns), stop letting it override the live compass.
+  useEffect(() => {
+    if (!fix || fix.courseHeading === null) return
+    const remaining = Math.max(0, fix.timestamp + MAX_COURSE_AGE_MS - Date.now())
+    const timer = window.setTimeout(() => setExpiredCourseTimestamp(fix.timestamp), remaining + 50)
+    return () => window.clearTimeout(timer)
+  }, [fix])
+  const courseStale = fix !== null && expiredCourseTimestamp === fix.timestamp
+
   const navigationHeading = chooseNavigationHeading({
     compassHeading: heading,
     compassConfidence: headingConfidence,
     needsCalibration,
     courseHeading: fix?.courseHeading ?? null,
     courseConfidence: fix?.courseConfidence ?? null,
+    courseStale,
   })
+  // Hysteresis keyed off the arrow being shown, so GPS jitter around the
+  // reliability threshold can't strobe the arrow during the final approach.
   const bearingReliable =
     fix !== null &&
     rawDistanceMeters !== null &&
     isBearingReliable({
       distanceMeters: rawDistanceMeters,
       accuracyMeters: fix.accuracy,
+      wasReliable: arrowRotation !== null,
     })
 
-  // Arrow rotation via a continuous unwrapped angle so CSS animates the short arc (PRD §12).
+  // Arrow rotation via a continuous unwrapped angle so CSS animates the short
+  // arc (PRD §12). The arrow keeps rendering the previous rotation for the
+  // one frame until this effect commits — never gate the arrow on the
+  // rotation matching this render's inputs, or it blinks off on every update.
   useEffect(() => {
-    if (!fix || navigationHeading.heading === null || !bearingReliable) {
-      unwrappedRotationRef.current = null
-      return
+    const headingDeg = navigationHeading.heading
+    // When the arrow is hidden, clear the rotation rather than keep it:
+    // repainting a stale unwrapped angle on re-show would animate a
+    // wrong-way multi-turn spin.
+    let next: number | null = null
+    if (fix !== null && headingDeg !== null && !fixStale && bearingReliable) {
+      const bearing = bearingDegrees(fix.lat, fix.lng, stop.lat, stop.lng)
+      const prev = unwrappedRotationRef.current
+      next = prev === null ? normalize360(bearing - headingDeg) : unwrapAngle(prev, bearing - headingDeg)
     }
-    const bearing = bearingDegrees(fix.lat, fix.lng, stop.lat, stop.lng)
-    const target = bearing - navigationHeading.heading
-    const prev = unwrappedRotationRef.current
-    const next = prev === null ? ((target % 360) + 360) % 360 : unwrapAngle(prev, target)
     unwrappedRotationRef.current = next
-    setArrowRotation({
-      value: next,
-      fixTimestamp: fix.timestamp,
-      heading: navigationHeading.heading,
-      stopLat: stop.lat,
-      stopLng: stop.lng,
-    })
-  }, [bearingReliable, fix, navigationHeading.heading, stop.lat, stop.lng])
+    setArrowRotation(next)
+  }, [bearingReliable, fix, fixStale, navigationHeading.heading, stop.lat, stop.lng])
 
   const handleMarkFound = () => {
     // Manual override needs a second tap when GPS can't corroborate it (PRD §6.8).
@@ -171,16 +180,10 @@ export function NavigationScreen({
   }
 
   const hasFix = fix !== null
-  const headingLive = navigationHeading.heading !== null
-  const arrowMatchesInputs =
-    arrowRotation !== null &&
-    fix !== null &&
-    navigationHeading.heading !== null &&
-    arrowRotation.fixTimestamp === fix.timestamp &&
-    arrowRotation.heading === navigationHeading.heading &&
-    arrowRotation.stopLat === stop.lat &&
-    arrowRotation.stopLng === stop.lng
-  const showDirectionArrow = headingLive && hasFix && !fixStale && bearingReliable && arrowMatchesInputs
+  // Heading loss, staleness, and reliability hide the arrow on the render
+  // they flip; the rotation state catches up (clears) in the effect above.
+  const showDirectionArrow =
+    arrowRotation !== null && navigationHeading.heading !== null && !fixStale && bearingReliable
   const distance = arrival.smoothedDistance !== null ? formatDistance(arrival.smoothedDistance) : null
   const heat = arrival.smoothedDistance !== null ? heatLevel(arrival.smoothedDistance, radiusMeters) : null
   const ringFraction = approachProgress(arrival.startDistance, arrival.smoothedDistance)
@@ -236,7 +239,7 @@ export function NavigationScreen({
             {showDirectionArrow ? (
               <div
                 className="transition-transform duration-200 ease-out"
-                style={{ transform: `rotate(${arrowRotation.value}deg)` }}
+                style={{ transform: `rotate(${arrowRotation}deg)` }}
                 role="img"
                 aria-label="Direction to target"
               >
@@ -257,9 +260,11 @@ export function NavigationScreen({
                     <p className="text-sm font-medium leading-relaxed text-muted-foreground">
                       {!hasFix
                         ? 'Getting your location…'
-                        : !bearingReliable
-                          ? 'Direction is noisy this close; use distance'
-                          : 'Waiting for compass…'}
+                        : fixStale
+                          ? 'Waiting for GPS signal…'
+                          : !bearingReliable
+                            ? 'Direction is noisy this close; use distance'
+                            : 'Waiting for compass…'}
                     </p>
                   </>
                 )}

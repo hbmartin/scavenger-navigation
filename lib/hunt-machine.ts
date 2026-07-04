@@ -28,6 +28,7 @@ export type HuntEvent =
   | { type: 'START' }
   | { type: 'ARRIVED'; stopSlug: string }
   | { type: 'NEXT' }
+  | { type: 'RESET' }
 
 export function initialHuntState(huntId: string): HuntState {
   return {
@@ -112,6 +113,15 @@ export function makeHuntReducer(stopCount: number) {
           ...state,
           phase: 'navigating',
           progress: { ...state.progress, currentIndex: state.progress.currentIndex + 1 },
+        }
+      }
+
+      case 'RESET': {
+        if (state.phase !== 'complete') return state
+        return {
+          ...state,
+          phase: 'permission-gate',
+          progress: defaultProgress(state.progress.huntId),
         }
       }
     }

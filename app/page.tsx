@@ -105,6 +105,10 @@ export default function HuntPage() {
     dispatch({ type: 'NEXT' })
   }, [])
 
+  const handleRestart = useCallback(() => {
+    dispatch({ type: 'RESET' })
+  }, [])
+
   switch (phase) {
     case 'init':
       return <main className="min-h-dvh" aria-busy="true" />
@@ -145,6 +149,12 @@ export default function HuntPage() {
         />
       )
     case 'complete':
-      return <CompleteScreen huntTitle={HUNT.title} stopCount={HUNT.stops.length} />
+      return (
+        <CompleteScreen
+          huntTitle={HUNT.title}
+          stopCount={HUNT.stops.length}
+          onRestart={handleRestart}
+        />
+      )
   }
 }

@@ -24,6 +24,12 @@ const MEDIUM_CONFIDENCE_ACCURACY_M = 30
 const MAX_COURSE_ACCURACY_M = 40
 const MIN_DERIVED_COURSE_DISTANCE_M = 6
 const DERIVED_DISTANCE_ACCURACY_MULTIPLIER = 0.75
+// A base point older than this can't give a meaningful average speed: after a
+// stationary pause, distance/elapsed dilutes toward zero and suppresses the
+// course long after walking resumes. The watcher re-bases at this age, and the
+// estimator rejects anything older (belt for callers that don't re-base).
+export const MAX_COURSE_BASE_AGE_MS = 15000
+const MAX_DERIVED_COURSE_WINDOW_S = 20
 
 function finiteNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -65,7 +71,7 @@ export function derivedCourseEstimate(
   if (!prev) return null
 
   const elapsedSeconds = (next.timestamp - prev.timestamp) / 1000
-  if (elapsedSeconds <= 0) return null
+  if (elapsedSeconds <= 0 || elapsedSeconds > MAX_DERIVED_COURSE_WINDOW_S) return null
 
   const distance = haversineMeters(prev.lat, prev.lng, next.lat, next.lng)
   const accuracy = Math.max(prev.accuracy, next.accuracy)

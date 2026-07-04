@@ -74,6 +74,24 @@ describe('hunt machine', () => {
     expect(s.progress.completedStopSlugs).toHaveLength(STOP_COUNT)
   })
 
+  it('RESET restarts completed progress at the permission gate', () => {
+    const complete = reducer(initialHuntState('h1'), {
+      type: 'RESTORE',
+      progress: {
+        ...defaultProgress('h1'),
+        started: true,
+        currentIndex: STOP_COUNT - 1,
+        completedStopSlugs: ['stop-0', 'stop-1', 'stop-2'],
+        finished: true,
+      },
+    })
+
+    const restarted = reducer(complete, { type: 'RESET' })
+
+    expect(restarted.phase).toBe('permission-gate')
+    expect(restarted.progress).toEqual(defaultProgress('h1'))
+  })
+
   it('permission denial blocks, and a later grant resumes', () => {
     let s = run(initialHuntState('h1'), [
       { type: 'RESTORE', progress: defaultProgress('h1') },
