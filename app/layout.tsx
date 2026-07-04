@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 import './globals.css'
 
 const _geistSans = Geist({ subsets: ['latin'] })
@@ -47,6 +48,7 @@ export default function RootLayout({
     <html lang="en" className="light bg-background">
       <body className="font-sans antialiased">
         {children}
+        <ServiceWorkerRegistration />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
