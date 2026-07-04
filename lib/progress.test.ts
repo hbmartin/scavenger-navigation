@@ -36,7 +36,7 @@ describe('loadProgress', () => {
       huntId: HUNT_ID,
       started: true,
       currentIndex: 2,
-      completedStopIds: ['a', 'b'],
+      completedStopSlugs: ['a', 'b'],
       finished: false,
     }
     saveProgress(progress)
@@ -65,6 +65,26 @@ describe('loadProgress', () => {
     expect(loadProgress(HUNT_ID)).toEqual({ ...defaultProgress(HUNT_ID), started: true })
   })
 
+  it('drops legacy completed stop ids while preserving compatible progress fields', () => {
+    storage.setItem(
+      KEY,
+      JSON.stringify({
+        huntId: HUNT_ID,
+        started: true,
+        currentIndex: 2,
+        completedStopIds: ['old-explicit-id'],
+        finished: true,
+      }),
+    )
+
+    expect(loadProgress(HUNT_ID)).toEqual({
+      ...defaultProgress(HUNT_ID),
+      started: true,
+      currentIndex: 2,
+      finished: true,
+    })
+  })
+
   it('rejects wrong-typed fields wholesale', () => {
     storage.setItem(
       KEY,
@@ -74,7 +94,7 @@ describe('loadProgress', () => {
 
     storage.setItem(
       KEY,
-      JSON.stringify({ ...defaultProgress(HUNT_ID), completedStopIds: [1, 2] }),
+      JSON.stringify({ ...defaultProgress(HUNT_ID), completedStopSlugs: [1, 2] }),
     )
     expect(loadProgress(HUNT_ID)).toEqual(defaultProgress(HUNT_ID))
 

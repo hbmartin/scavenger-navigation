@@ -26,7 +26,7 @@ export type HuntEvent =
   | { type: 'PERMISSIONS_BLOCKED'; reason: BlockedReason }
   | { type: 'COMPASS_LOST' }
   | { type: 'START' }
-  | { type: 'ARRIVED'; stopId: string }
+  | { type: 'ARRIVED'; stopSlug: string }
   | { type: 'NEXT' }
 
 export function initialHuntState(huntId: string): HuntState {
@@ -88,13 +88,13 @@ export function makeHuntReducer(stopCount: number) {
 
       case 'ARRIVED': {
         if (state.phase !== 'navigating') return state
-        const completed = state.progress.completedStopIds.includes(event.stopId)
-          ? state.progress.completedStopIds
-          : [...state.progress.completedStopIds, event.stopId]
+        const completed = state.progress.completedStopSlugs.includes(event.stopSlug)
+          ? state.progress.completedStopSlugs
+          : [...state.progress.completedStopSlugs, event.stopSlug]
         return {
           ...state,
           phase: 'arrived',
-          progress: { ...state.progress, completedStopIds: completed },
+          progress: { ...state.progress, completedStopSlugs: completed },
         }
       }
 

@@ -63,15 +63,15 @@ describe('hunt machine', () => {
 
     for (let i = 0; i < STOP_COUNT; i++) {
       expect(s.progress.currentIndex).toBe(i)
-      s = reducer(s, { type: 'ARRIVED', stopId: `stop-${i}` })
+      s = reducer(s, { type: 'ARRIVED', stopSlug: `stop-${i}` })
       expect(s.phase).toBe('arrived')
-      expect(s.progress.completedStopIds).toContain(`stop-${i}`)
+      expect(s.progress.completedStopSlugs).toContain(`stop-${i}`)
       s = reducer(s, { type: 'NEXT' })
     }
 
     expect(s.phase).toBe('complete')
     expect(s.progress.finished).toBe(true)
-    expect(s.progress.completedStopIds).toHaveLength(STOP_COUNT)
+    expect(s.progress.completedStopSlugs).toHaveLength(STOP_COUNT)
   })
 
   it('permission denial blocks, and a later grant resumes', () => {
@@ -113,14 +113,14 @@ describe('hunt machine', () => {
     expect(reducer(complete, { type: 'COMPASS_LOST' })).toBe(complete)
   })
 
-  it('does not duplicate an already-completed stop id', () => {
+  it('does not duplicate an already-completed stop slug', () => {
     const s = run(initialHuntState('h1'), [
-      { type: 'RESTORE', progress: { ...defaultProgress('h1'), completedStopIds: ['stop-0'] } },
+      { type: 'RESTORE', progress: { ...defaultProgress('h1'), completedStopSlugs: ['stop-0'] } },
       { type: 'PERMISSIONS_GRANTED' },
       { type: 'START' },
-      { type: 'ARRIVED', stopId: 'stop-0' },
+      { type: 'ARRIVED', stopSlug: 'stop-0' },
     ])
-    expect(s.progress.completedStopIds).toEqual(['stop-0'])
+    expect(s.progress.completedStopSlugs).toEqual(['stop-0'])
   })
 
   it('ignores illegal events for the current phase', () => {
@@ -129,7 +129,7 @@ describe('hunt machine', () => {
       progress: defaultProgress('h1'),
     })
     expect(reducer(gate, { type: 'START' })).toBe(gate)
-    expect(reducer(gate, { type: 'ARRIVED', stopId: 'x' })).toBe(gate)
+    expect(reducer(gate, { type: 'ARRIVED', stopSlug: 'x' })).toBe(gate)
     expect(reducer(gate, { type: 'NEXT' })).toBe(gate)
     // A second RESTORE after leaving init is a no-op.
     expect(reducer(gate, { type: 'RESTORE', progress: defaultProgress('h2') })).toBe(gate)

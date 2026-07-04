@@ -61,7 +61,7 @@ export function NavigationScreen({
   needsCalibration,
   onArrived,
 }: NavigationScreenProps) {
-  // Per-stop state resets via the `key={stop.id}` remount from HuntPage.
+  // Per-stop state resets via the slug-based key remount from HuntPage.
   const [arrival, setArrival] = useState<ArrivalState>(INITIAL_ARRIVAL_STATE)
   const [arrowRotation, setArrowRotation] = useState<number | null>(null)
   const [confirmingFound, setConfirmingFound] = useState(false)

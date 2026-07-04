@@ -6,7 +6,7 @@ export const ProgressSchema = z.object({
   huntId: z.string(),
   started: z.boolean(),
   currentIndex: z.number().int().min(0), // index into hunt.stops
-  completedStopIds: z.array(z.string()),
+  completedStopSlugs: z.array(z.string()),
   finished: z.boolean(),
 })
 
@@ -19,7 +19,7 @@ export function defaultProgress(huntId: string): Progress {
     huntId,
     started: false,
     currentIndex: 0,
-    completedStopIds: [],
+    completedStopSlugs: [],
     finished: false,
   }
 }
