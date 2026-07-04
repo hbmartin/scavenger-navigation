@@ -27,6 +27,7 @@ describe('nativeCourseEstimate', () => {
       heading: 10,
       source: 'native',
       confidence: 'high',
+      windowSeconds: 0,
     })
   })
 
@@ -95,6 +96,9 @@ describe('derivedCourseEstimate', () => {
     const estimate = derivedCourseEstimate(base, next)
     expect(estimate).not.toBeNull()
     expect(estimate?.confidence).toBe('medium')
+    // The window length rides along so heading selection can refuse to let a
+    // long chord (which may embed an old turn) overrule a trusted compass.
+    expect(estimate?.windowSeconds).toBe(25)
   })
 })
 

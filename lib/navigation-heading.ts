@@ -13,6 +13,36 @@ export interface NavigationHeadingChoice {
   source: NavigationHeadingSource | null
 }
 
+// iOS webkitCompassAccuracy tier boundaries (PRD §12).
+export const IOS_MEDIUM_ACCURACY_DEG = 35
+export const IOS_HIGH_ACCURACY_DEG = 18
+const CONFIDENCE_HYSTERESIS_DEG = 4
+
+// webkitCompassAccuracy jitters at event rate (~50Hz); accuracy dwelling on a
+// tier boundary must not flip the confidence tier — and with it the whole
+// navigation tree plus the BLEND_RULES weights — at sensor rate. Promotion
+// happens at the nominal boundary; demotion only once accuracy clears it by
+// the hysteresis margin. Only the exit gates widen: widening the entry gates
+// instead would strand a steady mid-band accuracy (e.g. 15°, inside the old
+// 14° entry gate) one tier below its nominal classification forever.
+export function compassConfidenceFromAccuracy(
+  accuracy: number | undefined,
+  previous: HeadingConfidence,
+): HeadingConfidence {
+  if (typeof accuracy !== 'number' || accuracy < 0) return 'low'
+  const highGate =
+    previous === 'high'
+      ? IOS_HIGH_ACCURACY_DEG + CONFIDENCE_HYSTERESIS_DEG
+      : IOS_HIGH_ACCURACY_DEG
+  const mediumGate =
+    previous === 'low'
+      ? IOS_MEDIUM_ACCURACY_DEG
+      : IOS_MEDIUM_ACCURACY_DEG + CONFIDENCE_HYSTERESIS_DEG
+  if (accuracy <= highGate) return 'high'
+  if (accuracy <= mediumGate) return 'medium'
+  return 'low'
+}
+
 export const MIN_BEARING_DISTANCE_METERS = 8
 export const BEARING_ACCURACY_MULTIPLIER = 2
 // Hysteresis band so GPS jitter near the threshold can't strobe the arrow:
@@ -24,6 +54,12 @@ export const BEARING_HIDE_MULTIPLIER = 0.85
 // replaced it for this long, it must not override a live compass (e.g. the
 // user stopped and turned in place while the platform stopped sending fixes).
 export const MAX_COURSE_AGE_MS = 4000
+// A derived course averaged over a longer window than this is a chord through
+// history — it can embed a turn made many seconds ago (walk north 15 s, turn
+// east: the chord points northeast long after the turn). Such a course may
+// still blend when it broadly agrees, but it must not overrule a live
+// high-confidence compass outright.
+export const MAX_OVERRIDE_COURSE_WINDOW_S = 15
 
 export function isBearingReliable(input: {
   distanceMeters: number
@@ -59,6 +95,9 @@ export function chooseNavigationHeading(input: {
   courseHeading: number | null
   courseConfidence: CourseConfidence | null
   courseStale: boolean
+  // Derivation window of the course estimate; null/omitted (native or
+  // unknown) is treated as instantaneous.
+  courseWindowSeconds?: number | null
 }): NavigationHeadingChoice {
   const hasCompass = input.compassHeading !== null && !input.needsCalibration
   const hasCourse =
@@ -84,6 +123,13 @@ export function chooseNavigationHeading(input: {
         { angle: course, weight: 1 - blend.compassWeight },
       ]) ?? course
     return { heading: blended, source: 'blended' }
+  }
+
+  const longWindow =
+    typeof input.courseWindowSeconds === 'number' &&
+    input.courseWindowSeconds > MAX_OVERRIDE_COURSE_WINDOW_S
+  if (longWindow && input.compassConfidence === 'high') {
+    return { heading: compass, source: 'compass' }
   }
 
   return { heading: course, source: 'gps-course' }

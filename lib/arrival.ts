@@ -83,13 +83,11 @@ export function approachProgress(
 }
 
 // ---- Stale-fix detection (PRD §6.5 hardening) ----
+// The staleness predicate itself lives in lib/timestamp-expiry.ts; the
+// navigation screen's watchdog applies it with this age.
 
 /** A fix older than this is treated as "GPS signal lost". */
 export const STALE_FIX_MS = 15000
-
-export function isFixStale(fixTimestamp: number, nowMs: number): boolean {
-  return nowMs - fixTimestamp > STALE_FIX_MS
-}
 
 // ---- "Mark found" guardrail (PRD §6.8 hardening) ----
 

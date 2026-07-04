@@ -163,6 +163,7 @@ export function NavigationScreen({
     courseHeading: fix?.courseHeading ?? null,
     courseConfidence: fix?.courseConfidence ?? null,
     courseStale,
+    courseWindowSeconds: fix?.courseWindowSeconds ?? null,
   })
   // Hysteresis keyed off the previous verdict, so GPS jitter around the
   // reliability threshold can't strobe the arrow during the final approach.

@@ -4,9 +4,7 @@ import {
   approachProgress,
   heatLevel,
   INITIAL_ARRIVAL_STATE,
-  isFixStale,
   manualMarkNeedsConfirmation,
-  STALE_FIX_MS,
   type ArrivalState,
 } from './arrival'
 import { DEBOUNCE_FIX_COUNT } from './hunt-data'
@@ -108,14 +106,6 @@ describe('approachProgress', () => {
   })
   it('clamps when the player walks away from the start', () => {
     expect(approachProgress(1000, 2000)).toBe(0)
-  })
-})
-
-describe('isFixStale', () => {
-  it('is fresh within the window and stale beyond it', () => {
-    const t0 = 1_700_000_000_000
-    expect(isFixStale(t0, t0 + STALE_FIX_MS)).toBe(false)
-    expect(isFixStale(t0, t0 + STALE_FIX_MS + 1)).toBe(true)
   })
 })
 

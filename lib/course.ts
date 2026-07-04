@@ -15,6 +15,10 @@ export interface CourseEstimate {
   speed: number
   source: CourseSource
   confidence: CourseConfidence
+  // Seconds of history the heading averages over: 0 for native (the platform
+  // reports the instantaneous course), the base-to-fix elapsed time for
+  // derived chords. Long windows can embed a turn made many seconds ago.
+  windowSeconds: number
 }
 
 export const MIN_COURSE_SPEED_MPS = 0.8
@@ -64,6 +68,7 @@ export function nativeCourseEstimate(
     speed,
     source: 'native',
     confidence,
+    windowSeconds: 0,
   }
 }
 
@@ -81,9 +86,10 @@ export function courseBaseExpired(base: CoursePoint, next: CoursePoint): boolean
   const elapsedMs = next.timestamp - base.timestamp
   if (elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return true
   if (elapsedMs <= STATIONARY_REBASE_AGE_MS) return false
-  if (!Number.isFinite(base.accuracy) || base.accuracy > MAX_COURSE_ACCURACY_M) return true
+  // "A pace/accuracy the estimator could ever accept" is the estimator's own
+  // gate — delegate so the two can't drift apart.
   const distance = haversineMeters(base.lat, base.lng, next.lat, next.lng)
-  return distance / (elapsedMs / 1000) < MIN_COURSE_SIGNAL_SPEED_MPS
+  return courseConfidence(distance / (elapsedMs / 1000), base.accuracy) === null
 }
 
 export function derivedCourseEstimate(
@@ -113,5 +119,6 @@ export function derivedCourseEstimate(
     speed,
     source: 'derived',
     confidence,
+    windowSeconds: elapsedSeconds,
   }
 }

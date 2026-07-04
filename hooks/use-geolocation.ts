@@ -18,6 +18,7 @@ export interface Fix {
   timestamp: number
   courseHeading: number | null // direction of travel, degrees clockwise from true north
   courseConfidence: CourseConfidence | null
+  courseWindowSeconds: number | null // seconds of history the course averages over
 }
 
 export function useGeolocation(active: boolean) {
@@ -74,6 +75,7 @@ export function useGeolocation(active: boolean) {
           timestamp: point.timestamp,
           courseHeading: course?.heading ?? null,
           courseConfidence: course?.confidence ?? null,
+          courseWindowSeconds: course?.windowSeconds ?? null,
         })
       },
       (err) => {
