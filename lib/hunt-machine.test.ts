@@ -41,6 +41,15 @@ describe('hunt machine', () => {
     expect(s.progress.currentIndex).toBe(STOP_COUNT - 1)
   })
 
+  it('RESTORE clamps negative currentIndex to zero', () => {
+    const s = reducer(initialHuntState('h1'), {
+      type: 'RESTORE',
+      progress: { ...defaultProgress('h1'), started: true, currentIndex: -5 },
+    })
+    expect(s.phase).toBe('permission-gate')
+    expect(s.progress.currentIndex).toBe(0)
+  })
+
   it('walks the full happy path through every stop', () => {
     let s = run(initialHuntState('h1'), [
       { type: 'RESTORE', progress: defaultProgress('h1') },

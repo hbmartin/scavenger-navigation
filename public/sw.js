@@ -20,13 +20,13 @@ self.addEventListener('install', (event) => {
     caches
       .open(CACHE_NAME)
       .then((cache) =>
-        Promise.all(
-          APP_SHELL.map((url) =>
-            cache.add(url).catch((err) => {
-              console.warn('SW precache failed for', url, err)
-            }),
-          ),
-        ),
+        Promise.allSettled(APP_SHELL.map((url) => cache.add(url))).then((results) => {
+          const failures = results.filter((result) => result.status === 'rejected')
+          if (failures.length > 0) {
+            console.warn('SW precache failed', failures)
+            throw new Error('SW precache failed')
+          }
+        }),
       )
       .then(() => self.skipWaiting()),
   )
