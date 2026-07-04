@@ -129,6 +129,17 @@ describe('courseBaseExpired', () => {
     expect(courseBaseExpired(base, next)).toBe(false)
   })
 
+  it('expires an inaccurate base past the grace period even while moving', () => {
+    const inaccurateBase: CoursePoint = { ...base, accuracy: 50 }
+    const next: CoursePoint = {
+      lat: 34.0002,
+      lng: -118,
+      accuracy: 8,
+      timestamp: base.timestamp + 16_000,
+    }
+    expect(courseBaseExpired(inaccurateBase, next)).toBe(true)
+  })
+
   it('expires any base once the derivation window closes', () => {
     const next: CoursePoint = {
       lat: 34.001,

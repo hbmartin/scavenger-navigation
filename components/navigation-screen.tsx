@@ -60,12 +60,14 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 const WATCHDOG_SLACK_MS = 250
 
 /**
- * True once `timestamp` has gone unreplaced for `maxAgeMs`. The flag is
- * derived (expired === timestamp) so a fresh timestamp clears it without an
- * extra render. The timer re-checks the clock when it fires and re-arms if it
- * fired early — background tabs clamp timers.
+ * True once `timestamp` has gone unreplaced for `maxAgeMs`. Already-old
+ * timestamps are expired against the hook's first render time; the latched
+ * timestamp catches timestamps that age out after mount. The timer re-checks
+ * the clock when it fires and re-arms if it fired early — background tabs
+ * clamp timers.
  */
 function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolean {
+  const [initialNowMs] = useState(() => Date.now())
   const [expiredTimestamp, setExpiredTimestamp] = useState<number | null>(null)
 
   useEffect(() => {
@@ -83,7 +85,8 @@ function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolea
     return () => window.clearTimeout(timer)
   }, [timestamp, maxAgeMs])
 
-  return timestamp !== null && expiredTimestamp === timestamp
+  const expiredOnFirstRender = timestamp !== null && initialNowMs >= timestamp + maxAgeMs
+  return timestamp !== null && (expiredOnFirstRender || expiredTimestamp === timestamp)
 }
 
 export function NavigationScreen({

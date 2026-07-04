@@ -69,17 +69,19 @@ export function nativeCourseEstimate(
 
 /**
  * Should the derived-course base re-anchor onto the current point? True when
- * the window is too old to describe the present, or when the user has sat on
- * this base past the stationary grace period without accruing distance at a
- * pace the estimator could ever accept — a pause would otherwise dilute
- * distance/elapsed and suppress the course long after walking resumes. A
- * merely old base that IS accruing distance survives, so slow walkers still
- * get a course once they cover the minimum distance.
+ * the window is too old to describe the present, when the base accuracy is too
+ * poor for the estimator to ever accept, or when the user has sat on this base
+ * past the stationary grace period without accruing distance at a pace the
+ * estimator could ever accept — a pause would otherwise dilute distance/elapsed
+ * and suppress the course long after walking resumes. A merely old base that
+ * IS accruing distance survives, so slow walkers still get a course once they
+ * cover the minimum distance.
  */
 export function courseBaseExpired(base: CoursePoint, next: CoursePoint): boolean {
   const elapsedMs = next.timestamp - base.timestamp
   if (elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return true
   if (elapsedMs <= STATIONARY_REBASE_AGE_MS) return false
+  if (!Number.isFinite(base.accuracy) || base.accuracy > MAX_COURSE_ACCURACY_M) return true
   const distance = haversineMeters(base.lat, base.lng, next.lat, next.lng)
   return distance / (elapsedMs / 1000) < MIN_COURSE_SIGNAL_SPEED_MPS
 }
