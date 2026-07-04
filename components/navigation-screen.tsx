@@ -71,6 +71,7 @@ function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolea
 
   useEffect(() => {
     if (timestamp === null) return
+    if (isTimestampExpired(timestamp, maxAgeMs)) return
     let timer: number | undefined
     const arm = () => {
       const remainingMs = timestamp + maxAgeMs - Date.now()

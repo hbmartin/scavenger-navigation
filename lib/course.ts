@@ -34,8 +34,8 @@ const DERIVED_DISTANCE_ACCURACY_MULTIPLIER = 0.75
 // covers the minimum distance at the worst medium-confidence accuracy
 // (0.75 × 30 m = 22.5 m at 0.8 m/s ≈ 28 s) before the window closes.
 export const MAX_DERIVED_COURSE_WINDOW_MS = 30_000
-// Age below which a base is always kept: gives distance time to accrue past
-// the accuracy noise floor before any stationary judgment is made.
+// Age below which an otherwise usable base is kept: gives distance time to
+// accrue past the accuracy noise floor before any stationary judgment is made.
 const STATIONARY_REBASE_AGE_MS = 15_000
 
 function finiteNumber(value: number | null | undefined): value is number {
@@ -84,7 +84,9 @@ export function nativeCourseEstimate(
  */
 export function courseBaseExpired(base: CoursePoint, next: CoursePoint): boolean {
   const elapsedMs = next.timestamp - base.timestamp
+  if (elapsedMs <= 0) return true
   if (elapsedMs > MAX_DERIVED_COURSE_WINDOW_MS) return true
+  if (courseConfidence(MIN_COURSE_SPEED_MPS, base.accuracy) === null) return true
   if (elapsedMs <= STATIONARY_REBASE_AGE_MS) return false
   // "A pace/accuracy the estimator could ever accept" is the estimator's own
   // gate — delegate so the two can't drift apart.
