@@ -31,6 +31,7 @@ import {
   MAX_COURSE_AGE_MS,
   type HeadingConfidence,
 } from '@/lib/navigation-heading'
+import { isTimestampExpired } from '@/lib/timestamp-expiry'
 
 interface NavigationScreenProps {
   stop: Stop
@@ -61,13 +62,11 @@ const WATCHDOG_SLACK_MS = 250
 
 /**
  * True once `timestamp` has gone unreplaced for `maxAgeMs`. Already-old
- * timestamps are expired against the hook's first render time; the latched
- * timestamp catches timestamps that age out after mount. The timer re-checks
- * the clock when it fires and re-arms if it fired early — background tabs
- * clamp timers.
+ * timestamps are expired against the current render time; the latched timestamp
+ * catches timestamps that age out after mount. The timer re-checks the clock
+ * when it fires and re-arms if it fired early — background tabs clamp timers.
  */
 function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolean {
-  const [initialNowMs] = useState(() => Date.now())
   const [expiredTimestamp, setExpiredTimestamp] = useState<number | null>(null)
 
   useEffect(() => {
@@ -85,8 +84,10 @@ function useExpiredTimestamp(timestamp: number | null, maxAgeMs: number): boolea
     return () => window.clearTimeout(timer)
   }, [timestamp, maxAgeMs])
 
-  const expiredOnFirstRender = timestamp !== null && initialNowMs >= timestamp + maxAgeMs
-  return timestamp !== null && (expiredOnFirstRender || expiredTimestamp === timestamp)
+  return (
+    timestamp !== null &&
+    (expiredTimestamp === timestamp || isTimestampExpired(timestamp, maxAgeMs))
+  )
 }
 
 export function NavigationScreen({
