@@ -13,7 +13,7 @@ import { StartScreen } from '@/components/start-screen'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { useHeading } from '@/hooks/use-heading'
 import { useWakeLock } from '@/hooks/use-wake-lock'
-import { HUNT } from '@/lib/hunt-data'
+import { getStopSlug, HUNT } from '@/lib/hunt-data'
 import { initialHuntState, makeHuntReducer } from '@/lib/hunt-machine'
 import { loadProgress, saveProgress } from '@/lib/progress'
 
@@ -93,12 +93,13 @@ export default function HuntPage() {
   }, [])
 
   const currentStop = HUNT.stops[Math.min(progress.currentIndex, HUNT.stops.length - 1)]
+  const currentStopSlug = getStopSlug(currentStop)
   const radiusMeters = currentStop.radiusMeters ?? HUNT.arrivalRadiusMeters
 
   const handleArrived = useCallback(() => {
     vibrateArrival()
-    dispatch({ type: 'ARRIVED', stopId: currentStop.id })
-  }, [currentStop.id])
+    dispatch({ type: 'ARRIVED', stopSlug: currentStopSlug })
+  }, [currentStopSlug])
 
   const handleNext = useCallback(() => {
     dispatch({ type: 'NEXT' })
@@ -120,7 +121,7 @@ export default function HuntPage() {
     case 'navigating':
       return (
         <NavigationScreen
-          key={currentStop.id} // remount per stop so smoothing/debounce state resets
+          key={currentStopSlug} // remount per stop so smoothing/debounce state resets
           stop={currentStop}
           stopNumber={progress.currentIndex + 1}
           stopCount={HUNT.stops.length}

@@ -3,7 +3,6 @@
 // Stops below are sample LA landmarks — swap in your real coordinates.
 
 export interface Stop {
-  id: string // stable, used for progress persistence
   name: string // revealed only on arrival
   lat: number
   lng: number
@@ -18,46 +17,38 @@ export interface Hunt {
   stops: Stop[]
 }
 
+export function getStopSlug(stop: Pick<Stop, 'name'>): string {
+  return stop.name
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export const HUNT: Hunt = {
   id: 'melrose-art-hunt-v1',
   title: 'The Melrose Art Hunt',
   arrivalRadiusMeters: 25,
   stops: [
     {
-      id: 'griffith',
-      name: 'Griffith Observatory',
-      lat: 34.118434,
-      lng: -118.300393,
-      photoUrl: '/stops/griffith-observatory.png',
+      name: 'Test1',
+      lat: 34.06096793684116,
+      lng: -118.38029366026275,
     },
     {
-      id: 'hollywood-sign',
-      name: 'Hollywood Sign (Lake Hollywood Park)',
-      lat: 34.116856,
-      lng: -118.339383,
-      photoUrl: '/stops/hollywood-sign.png',
-    },
-    {
-      id: 'echo-park',
-      name: 'Echo Park Lake Fountain',
-      lat: 34.072861,
-      lng: -118.260495,
+      name: 'Test 2',
+      lat: 34.0650240483478,
+      lng: -118.38043573712486,
       photoUrl: '/stops/echo-park-lake.png',
     },
     {
-      id: 'venice-canals',
-      name: 'Venice Canals',
-      lat: 33.983215,
-      lng: -118.466171,
+      name: 'Test 3',
+      lat: 34.06501499474376,
+      lng: -118.37842480263997,
       photoUrl: '/stops/venice-canals.png',
-    },
-    {
-      id: 'santa-monica-pier',
-      name: 'Santa Monica Pier',
-      lat: 34.008663,
-      lng: -118.498646,
-      photoUrl: '/stops/santa-monica-pier.png',
-    },
+    }
   ],
 }
 
