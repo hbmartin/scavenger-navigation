@@ -25,6 +25,11 @@ import {
   unwrapAngle,
 } from '@/lib/geo'
 import type { Stop } from '@/lib/hunt-data'
+import {
+  chooseNavigationHeading,
+  isBearingReliable,
+  type HeadingConfidence,
+} from '@/lib/navigation-heading'
 
 interface NavigationScreenProps {
   stop: Stop
@@ -34,8 +39,17 @@ interface NavigationScreenProps {
   fix: Fix | null
   fixError: string | null
   heading: number | null
+  headingConfidence: HeadingConfidence
   needsCalibration: boolean
   onArrived: () => void
+}
+
+interface ArrowRotationState {
+  value: number
+  fixTimestamp: number
+  heading: number
+  stopLat: number
+  stopLng: number
 }
 
 // Hot/cold signal (PRD §6.4 polish): the ring warms up as the distance drops.
@@ -57,12 +71,13 @@ export function NavigationScreen({
   fix,
   fixError,
   heading,
+  headingConfidence,
   needsCalibration,
   onArrived,
 }: NavigationScreenProps) {
   // Per-stop state resets via the slug-based key remount from HuntPage.
   const [arrival, setArrival] = useState<ArrivalState>(INITIAL_ARRIVAL_STATE)
-  const [arrowRotation, setArrowRotation] = useState<number | null>(null)
+  const [arrowRotation, setArrowRotation] = useState<ArrowRotationState | null>(null)
   const [confirmingFound, setConfirmingFound] = useState(false)
   // Timestamp of the fix the watchdog has flagged as stale; staleness is
   // derived so a fresh fix clears the flag without extra renders.
@@ -108,16 +123,43 @@ export function NavigationScreen({
   }, [fix])
   const fixStale = fix !== null && staleFixTimestamp === fix.timestamp
 
+  const rawDistanceMeters = fix
+    ? haversineMeters(fix.lat, fix.lng, stop.lat, stop.lng)
+    : null
+  const navigationHeading = chooseNavigationHeading({
+    compassHeading: heading,
+    compassConfidence: headingConfidence,
+    needsCalibration,
+    courseHeading: fix?.courseHeading ?? null,
+    courseConfidence: fix?.courseConfidence ?? null,
+  })
+  const bearingReliable =
+    fix !== null &&
+    rawDistanceMeters !== null &&
+    isBearingReliable({
+      distanceMeters: rawDistanceMeters,
+      accuracyMeters: fix.accuracy,
+    })
+
   // Arrow rotation via a continuous unwrapped angle so CSS animates the short arc (PRD §12).
   useEffect(() => {
-    if (!fix || heading === null) return
+    if (!fix || navigationHeading.heading === null || !bearingReliable) {
+      unwrappedRotationRef.current = null
+      return
+    }
     const bearing = bearingDegrees(fix.lat, fix.lng, stop.lat, stop.lng)
-    const target = bearing - heading
+    const target = bearing - navigationHeading.heading
     const prev = unwrappedRotationRef.current
     const next = prev === null ? ((target % 360) + 360) % 360 : unwrapAngle(prev, target)
     unwrappedRotationRef.current = next
-    setArrowRotation(next)
-  }, [fix, heading, stop.lat, stop.lng])
+    setArrowRotation({
+      value: next,
+      fixTimestamp: fix.timestamp,
+      heading: navigationHeading.heading,
+      stopLat: stop.lat,
+      stopLng: stop.lng,
+    })
+  }, [bearingReliable, fix, navigationHeading.heading, stop.lat, stop.lng])
 
   const handleMarkFound = () => {
     // Manual override needs a second tap when GPS can't corroborate it (PRD §6.8).
@@ -129,7 +171,16 @@ export function NavigationScreen({
   }
 
   const hasFix = fix !== null
-  const headingLive = heading !== null && !needsCalibration
+  const headingLive = navigationHeading.heading !== null
+  const arrowMatchesInputs =
+    arrowRotation !== null &&
+    fix !== null &&
+    navigationHeading.heading !== null &&
+    arrowRotation.fixTimestamp === fix.timestamp &&
+    arrowRotation.heading === navigationHeading.heading &&
+    arrowRotation.stopLat === stop.lat &&
+    arrowRotation.stopLng === stop.lng
+  const showDirectionArrow = headingLive && hasFix && !fixStale && bearingReliable && arrowMatchesInputs
   const distance = arrival.smoothedDistance !== null ? formatDistance(arrival.smoothedDistance) : null
   const heat = arrival.smoothedDistance !== null ? heatLevel(arrival.smoothedDistance, radiusMeters) : null
   const ringFraction = approachProgress(arrival.startDistance, arrival.smoothedDistance)
@@ -180,10 +231,10 @@ export function NavigationScreen({
               />
             )}
           </svg>
-          {headingLive && hasFix && arrowRotation !== null ? (
+          {showDirectionArrow ? (
             <div
               className="transition-transform duration-200 ease-out"
-              style={{ transform: `rotate(${arrowRotation}deg)` }}
+              style={{ transform: `rotate(${arrowRotation.value}deg)` }}
               role="img"
               aria-label="Direction to target"
             >
@@ -202,7 +253,11 @@ export function NavigationScreen({
                 <>
                   <LocateFixed className="size-10 animate-pulse text-muted-foreground" aria-hidden="true" />
                   <p className="text-sm font-medium leading-relaxed text-muted-foreground">
-                    {!hasFix ? 'Getting your location…' : 'Waiting for compass…'}
+                    {!hasFix
+                      ? 'Getting your location…'
+                      : !bearingReliable
+                        ? 'Direction is noisy this close; use distance'
+                        : 'Waiting for compass…'}
                   </p>
                 </>
               )}

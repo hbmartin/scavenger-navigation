@@ -76,6 +76,46 @@ export function smoothAngle(
   return normalize360(Math.atan2(y, x) / DEG)
 }
 
+/** Circular mean of angles in degrees. Returns null for an empty list. */
+export function circularMeanDegrees(degrees: readonly number[]): number | null {
+  if (degrees.length === 0) return null
+  let x = 0
+  let y = 0
+  for (const deg of degrees) {
+    x += Math.cos(normalize360(deg) * DEG)
+    y += Math.sin(normalize360(deg) * DEG)
+  }
+  if (x === 0 && y === 0) return normalize360(degrees[degrees.length - 1])
+  return normalize360(Math.atan2(y, x) / DEG)
+}
+
+/** Weighted circular mean of angles in degrees. Ignores non-positive weights. */
+export function weightedCircularMeanDegrees(
+  samples: readonly { angle: number; weight: number }[],
+): number | null {
+  let x = 0
+  let y = 0
+  let lastAngle: number | null = null
+  for (const { angle, weight } of samples) {
+    if (weight <= 0) continue
+    const normalized = normalize360(angle)
+    x += Math.cos(normalized * DEG) * weight
+    y += Math.sin(normalized * DEG) * weight
+    lastAngle = normalized
+  }
+  if (lastAngle === null) return null
+  if (x === 0 && y === 0) return lastAngle
+  return normalize360(Math.atan2(y, x) / DEG)
+}
+
+/** Limit an angular update to a maximum signed step. */
+export function limitAngleStep(prevDeg: number, nextDeg: number, maxStepDeg: number): number {
+  const delta = shortestAngleDelta(prevDeg, nextDeg)
+  const maxStep = Math.abs(maxStepDeg)
+  const limited = Math.max(-maxStep, Math.min(maxStep, delta))
+  return normalize360(prevDeg + limited)
+}
+
 /** Scalar exponential smoothing for distance. */
 export function smoothScalar(
   prev: number | null,
@@ -88,8 +128,9 @@ export function smoothScalar(
 
 /** Meters below 1000 m, kilometers (1 decimal) above. */
 export function formatDistance(meters: number): { value: string; unit: string } {
-  if (meters < 1000) {
-    return { value: String(Math.round(meters)), unit: 'm' }
+  const roundedMeters = Math.round(meters)
+  if (roundedMeters < 1000) {
+    return { value: String(roundedMeters), unit: 'm' }
   }
   return { value: (meters / 1000).toFixed(1), unit: 'km' }
 }
