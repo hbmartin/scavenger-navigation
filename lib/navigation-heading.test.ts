@@ -3,7 +3,9 @@ import {
   chooseNavigationHeading,
   compassConfidenceFromAccuracy,
   isBearingReliable,
+  MAX_OVERRIDE_COURSE_WINDOW_S,
 } from './navigation-heading'
+import { MAX_DERIVED_COURSE_WINDOW_MS } from './course'
 
 describe('compassConfidenceFromAccuracy', () => {
   it('classifies steady accuracies at their nominal tier regardless of history', () => {
@@ -17,10 +19,21 @@ describe('compassConfidenceFromAccuracy', () => {
   })
 
   it('holds the tier until accuracy clears the boundary by the margin', () => {
-    expect(compassConfidenceFromAccuracy(21, 'high')).toBe('high')
-    expect(compassConfidenceFromAccuracy(23, 'high')).toBe('medium')
-    expect(compassConfidenceFromAccuracy(38, 'medium')).toBe('medium')
-    expect(compassConfidenceFromAccuracy(40, 'medium')).toBe('low')
+    expect(compassConfidenceFromAccuracy(25, 'high')).toBe('high')
+    expect(compassConfidenceFromAccuracy(27, 'high')).toBe('medium')
+    expect(compassConfidenceFromAccuracy(42, 'medium')).toBe('medium')
+    expect(compassConfidenceFromAccuracy(44, 'medium')).toBe('low')
+  })
+
+  it('settles instead of strobing when jitter spans a boundary', () => {
+    // ±3° wobble across the high boundary (17↔23) promotes once and holds;
+    // under a narrower margin it would flip tiers on every sensor event.
+    let tier = compassConfidenceFromAccuracy(17, 'medium')
+    expect(tier).toBe('high')
+    for (const accuracy of [23, 17, 23, 17]) {
+      tier = compassConfidenceFromAccuracy(accuracy, tier)
+      expect(tier).toBe('high')
+    }
   })
 
   it('demotes without hysteresis help once the previous tier is lost', () => {
@@ -77,6 +90,7 @@ describe('chooseNavigationHeading', () => {
         courseHeading: null,
         courseConfidence: null,
         courseStale: false,
+        courseWindowSeconds: null,
       }),
     ).toEqual({ heading: 45, source: 'compass' })
   })
@@ -90,6 +104,7 @@ describe('chooseNavigationHeading', () => {
         courseHeading: 90,
         courseConfidence: 'high',
         courseStale: false,
+        courseWindowSeconds: null,
       }),
     ).toEqual({ heading: 90, source: 'gps-course' })
   })
@@ -103,6 +118,7 @@ describe('chooseNavigationHeading', () => {
         courseHeading: 100,
         courseConfidence: 'high',
         courseStale: false,
+        courseWindowSeconds: null,
       }),
     ).toEqual({ heading: 100, source: 'gps-course' })
   })
@@ -116,6 +132,7 @@ describe('chooseNavigationHeading', () => {
         courseHeading: 10,
         courseConfidence: 'high',
         courseStale: true,
+        courseWindowSeconds: null,
       }),
     ).toEqual({ heading: 190, source: 'compass' })
   })
@@ -150,9 +167,25 @@ describe('chooseNavigationHeading', () => {
     ).toEqual({ heading: 22, source: 'gps-course' })
   })
 
-  it('lets a long-window course beat a compass that is not high-confidence', () => {
-    // Below high confidence the compass is the less trusted signal even
-    // against averaged history.
+  it('does not let a long-window chord overrule a medium-confidence compass', () => {
+    // The chord embeds an old turn just the same when the compass is medium;
+    // any blend-trusted compass holds against a >15 s chord.
+    expect(
+      chooseNavigationHeading({
+        compassHeading: 90,
+        compassConfidence: 'medium',
+        needsCalibration: false,
+        courseHeading: 22,
+        courseConfidence: 'medium',
+        courseStale: false,
+        courseWindowSeconds: 21,
+      }),
+    ).toEqual({ heading: 90, source: 'compass' })
+  })
+
+  it('lets a long-window course beat a low-confidence compass', () => {
+    // A low-confidence compass has no blend rule — the chord is still the
+    // better signal even against averaged history.
     expect(
       chooseNavigationHeading({
         compassHeading: 90,
@@ -187,10 +220,19 @@ describe('chooseNavigationHeading', () => {
       courseHeading: 20,
       courseConfidence: 'high',
       courseStale: false,
+      courseWindowSeconds: null,
     })
     expect(choice.source).toBe('blended')
     expect(choice.heading).not.toBeNull()
     expect(choice.heading as number).toBeGreaterThan(10)
     expect(choice.heading as number).toBeLessThan(20)
+  })
+})
+
+describe('MAX_OVERRIDE_COURSE_WINDOW_S', () => {
+  it('stays below the derivation cap so the override guard is reachable', () => {
+    // derivedCourseEstimate rejects windows past MAX_DERIVED_COURSE_WINDOW_MS,
+    // so a threshold at or above that cap could never fire.
+    expect(MAX_OVERRIDE_COURSE_WINDOW_S * 1000).toBeLessThan(MAX_DERIVED_COURSE_WINDOW_MS)
   })
 })
