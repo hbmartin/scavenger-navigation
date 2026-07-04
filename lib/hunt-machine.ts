@@ -39,7 +39,7 @@ export function initialHuntState(huntId: string): HuntState {
 
 function clampProgress(progress: Progress, stopCount: number): Progress {
   const lastStopIndex = Math.max(0, stopCount - 1)
-  const currentIndex = Math.min(progress.currentIndex, lastStopIndex)
+  const currentIndex = Math.max(0, Math.min(progress.currentIndex, lastStopIndex))
   return currentIndex === progress.currentIndex ? progress : { ...progress, currentIndex }
 }
 
